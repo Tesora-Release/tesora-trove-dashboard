@@ -1,0 +1,9 @@
+// The default theme directories bootstrap and horizon are straight copies
+// from the horizon themes/default/directory.
+@import "bootstrap/variables";
+@import "horizon/variables";
+@import "/horizon/lib/font-awesome/scss/variables";
+
+
+// This is the beginning of the Tesora customization
+@import "tesora/variables";

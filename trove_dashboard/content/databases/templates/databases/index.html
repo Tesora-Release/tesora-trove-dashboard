@@ -1,0 +1,11 @@
+{% extends 'base.html' %}
+{% load i18n %}
+{% block title %}{% trans "Instances" %}{% endblock %}
+
+{% block main %}
+  {{ table.render }}
+  <div class="version_label pull-right">
+    {% blocktrans with version_info=version %}Version: {{ version_info }}
+    {% endblocktrans %}
+  </div>
+{% endblock %}

@@ -1,0 +1,8 @@
+// The default theme directories bootstrap and horizon are straight copies
+// from the horizon themes/default/directory.
+@import "bootstrap/styles";
+@import "horizon/styles";
+
+
+// This is the beginning of the Tesora customization
+@import "tesora/styles";
