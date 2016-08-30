@@ -15,6 +15,7 @@
 
 import logging
 
+from django.utils.translation import pgettext_lazy
 from django.utils.translation import ugettext_lazy as _
 
 from horizon import exceptions
@@ -22,6 +23,44 @@ from horizon import exceptions
 from openstack_dashboard import api
 
 LOG = logging.getLogger(__name__)
+
+
+ACTIVE_STATES = ("ACTIVE",)
+STATUS_CHOICES = (
+    ("ACTIVE", True),
+    ("BLOCKED", True),
+    ("BUILD", None),
+    ("FAILED", False),
+    ("REBOOT", None),
+    ("RESIZE", None),
+    ("BACKUP", None),
+    ("SHUTDOWN", False),
+    ("ERROR", False),
+    ("RESTART_REQUIRED", None),
+)
+STATUS_DISPLAY_CHOICES = (
+    ("ACTIVE", pgettext_lazy("Current status of a Database Instance",
+                             u"Active")),
+    ("BLOCKED", pgettext_lazy("Current status of a Database Instance",
+                              u"Blocked")),
+    ("BUILD", pgettext_lazy("Current status of a Database Instance",
+                            u"Build")),
+    ("FAILED", pgettext_lazy("Current status of a Database Instance",
+                             u"Failed")),
+    ("REBOOT", pgettext_lazy("Current status of a Database Instance",
+                             u"Reboot")),
+    ("RESIZE", pgettext_lazy("Current status of a Database Instance",
+                             u"Resize")),
+    ("BACKUP", pgettext_lazy("Current status of a Database Instance",
+                             u"Backup")),
+    ("SHUTDOWN", pgettext_lazy("Current status of a Database Instance",
+                               u"Shutdown")),
+    ("ERROR", pgettext_lazy("Current status of a Database Instance",
+                            u"Error")),
+    ("RESTART_REQUIRED",
+     pgettext_lazy("Current status of a Database Instance",
+                   u"Restart Required")),
+)
 
 
 def volume_type_list(request):

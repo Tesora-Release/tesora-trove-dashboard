@@ -22,7 +22,7 @@ from horizon import workflows
 
 from trove_dashboard import api
 from trove_dashboard.content.databases import db_capability
-from trove_dashboard.content.databases import tables as project_tables
+from trove_dashboard.content import utils as database_utils
 
 
 LOG = logging.getLogger(__name__)
@@ -53,7 +53,7 @@ class BackupDetailsAction(workflows.Action):
             msg = _("Unable to list database instances to backup.")
             exceptions.handle(request, msg)
         return [(i.id, i.name) for i in instances
-                if (i.status in project_tables.ACTIVE_STATES) and
+                if (i.status in database_utils.ACTIVE_STATES) and
                    (db_capability.can_backup(i.datastore['type']))]
 
     def populate_parent_choices(self, request, context):

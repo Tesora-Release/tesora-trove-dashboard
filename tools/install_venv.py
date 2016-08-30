@@ -112,6 +112,9 @@ def pip_install(*args):
     args = [WITH_VENV, 'pip', 'install', '--upgrade'] + list(args)
     run_command(args, redirect_output=False)
 
+def pip_uninstall(*args):
+    args = [WITH_VENV, 'pip', 'uninstall', '-y'] + list(args)
+    run_command(args, redirect_output=False)
 
 def install_dependencies(venv=VENV):
     print "Installing dependencies..."
@@ -130,6 +133,11 @@ def install_horizon():
     print 'Installing horizon module in development mode...'
     run_command([WITH_VENV, 'python', 'setup.py', 'develop'], cwd=ROOT)
 
+def install_tesora_requirements():
+    branch_name = os.getenv('BRANCH_NAME', 'dev/EE-1.9')
+    pip_uninstall('python-troveclient')
+    pip_install('-e', "git://github.com/Tesora/tesora-python-troveclient.git@" + branch_name + "#egg=python-troveclient")
+    pip_install('-e', "git://github.com/Tesora/tesora-python-mistralclient.git@" + branch_name + "#egg=python-mistralclient")
 
 def print_summary():
     summary = """
@@ -148,6 +156,7 @@ def main():
     create_virtualenv()
     install_dependencies()
     install_horizon()
+    install_tesora_requirements()
     print_summary()
 
 if __name__ == '__main__':

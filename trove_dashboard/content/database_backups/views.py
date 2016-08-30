@@ -21,6 +21,7 @@ from django.utils.translation import ugettext_lazy as _
 from horizon import exceptions
 from horizon import tables as horizon_tables
 from horizon.utils import filters
+from horizon.utils import memoized
 from horizon import views as horizon_views
 from horizon import workflows as horizon_workflows
 
@@ -45,7 +46,7 @@ class IndexView(horizon_tables.DataTableView):
         instance = self._instances.get(instance_id)
         if instance is None:
             try:
-                instance = api.trove.instance_get(self.request, instance_id)
+                instance = self.get_instance(instance_id)
             except Exception:
                 instance = _('Not Found')
         backup.instance = instance
@@ -55,13 +56,21 @@ class IndexView(horizon_tables.DataTableView):
         # TODO(rmyers) Add pagination support after it is available
         # https://blueprints.launchpad.net/trove/+spec/paginate-backup-list
         try:
-            backups = api.trove.backup_list(self.request)
+            backups = self.get_backups()
             backups = map(self._get_extra_data, backups)
         except Exception:
             backups = []
             msg = _('Error getting database backup list.')
             exceptions.handle(self.request, msg)
         return backups
+
+    @memoized.memoized_method
+    def get_backups(self, marker=None):
+        return api.trove.backup_list(self.request, marker=marker)
+
+    @memoized.memoized_method
+    def get_instance(self, instance_id):
+        return api.trove.instance_get(self.request, instance_id)
 
 
 class BackupView(horizon_workflows.WorkflowView):

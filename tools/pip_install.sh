@@ -1,6 +1,6 @@
 #!/bin/sh
 
-BRANCH_NAME=${BRANCH_NAME:-master}
+BRANCH_NAME=${BRANCH_NAME:-dev/EE-1.9}
 BRANCH_NAME=${ZUUL_BRANCH:-$BRANCH_NAME}
 
 set -e
@@ -24,5 +24,8 @@ $uninstall_cmd python-troveclient
 # install python-troveclient from source
 PYTHON_TROVECLIENT_PIP_LOCATION="git://github.com/Tesora/tesora-python-troveclient.git@$BRANCH_NAME#egg=python-troveclient"
 $install_cmd -U -e ${PYTHON_TROVECLIENT_PIP_LOCATION}
+
+PYTHON_MISTRALCLIENT_PIP_LOCATION="git://github.com/Tesora/tesora-python-mistralclient.git@$BRANCH_NAME#egg=python-mistralclient"
+$install_cmd -U -e ${PYTHON_MISTRALCLIENT_PIP_LOCATION}
 
 exit $?

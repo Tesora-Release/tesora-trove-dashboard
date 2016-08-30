@@ -18,7 +18,7 @@ from django.utils.translation import ugettext_lazy as _
 from horizon import tables
 
 from trove_dashboard import api
-from trove_dashboard.content import databases
+from trove_dashboard.content import utils as database_utils
 
 
 class UpgradeInstanceAction(tables.LinkAction):
@@ -28,7 +28,7 @@ class UpgradeInstanceAction(tables.LinkAction):
     classes = ("ajax-modal",)
 
     def allowed(self, request, instance):
-        if instance.status in databases.tables.ACTIVE_STATES:
+        if instance.status in database_utils.ACTIVE_STATES:
             datastore_version_list = api.trove.datastore_version_list(
                 request, instance.datastore['type'])
             if datastore_version_list:

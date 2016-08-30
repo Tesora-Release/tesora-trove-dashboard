@@ -154,6 +154,18 @@ class ClustersTests(test.TestCase):
             fields['root_password'], field_name))
         self.assertFalse(self._contains_datastore_in_attribute(
             fields['num_instances_vertica'], field_name))
+        self.assertFalse(self._contains_datastore_in_attribute(
+            fields['oracle_rac_database'], field_name))
+        self.assertFalse(self._contains_datastore_in_attribute(
+            fields['oracle_rac_subnet'], field_name))
+        self.assertFalse(self._contains_datastore_in_attribute(
+            fields['oracle_rac_storage_type'], field_name))
+        self.assertFalse(self._contains_datastore_in_attribute(
+            fields['oracle_rac_votedisk_mount'], field_name))
+        self.assertFalse(self._contains_datastore_in_attribute(
+            fields['oracle_rac_registry_mount'], field_name))
+        self.assertFalse(self._contains_datastore_in_attribute(
+            fields['oracle_rac_database_mount'], field_name))
 
     def test_launch_cluster_redis_fields(self):
         datastore = 'redis'
@@ -173,6 +185,18 @@ class ClustersTests(test.TestCase):
             fields['root_password'], field_name))
         self.assertFalse(self._contains_datastore_in_attribute(
             fields['num_instances_vertica'], field_name))
+        self.assertFalse(self._contains_datastore_in_attribute(
+            fields['oracle_rac_database'], field_name))
+        self.assertFalse(self._contains_datastore_in_attribute(
+            fields['oracle_rac_subnet'], field_name))
+        self.assertFalse(self._contains_datastore_in_attribute(
+            fields['oracle_rac_storage_type'], field_name))
+        self.assertFalse(self._contains_datastore_in_attribute(
+            fields['oracle_rac_votedisk_mount'], field_name))
+        self.assertFalse(self._contains_datastore_in_attribute(
+            fields['oracle_rac_registry_mount'], field_name))
+        self.assertFalse(self._contains_datastore_in_attribute(
+            fields['oracle_rac_database_mount'], field_name))
 
     def test_launch_cluster_vertica_fields(self):
         datastore = 'vertica'
@@ -192,6 +216,18 @@ class ClustersTests(test.TestCase):
             fields['root_password'], field_name))
         self.assertTrue(self._contains_datastore_in_attribute(
             fields['num_instances_vertica'], field_name))
+        self.assertFalse(self._contains_datastore_in_attribute(
+            fields['oracle_rac_database'], field_name))
+        self.assertFalse(self._contains_datastore_in_attribute(
+            fields['oracle_rac_subnet'], field_name))
+        self.assertFalse(self._contains_datastore_in_attribute(
+            fields['oracle_rac_storage_type'], field_name))
+        self.assertFalse(self._contains_datastore_in_attribute(
+            fields['oracle_rac_votedisk_mount'], field_name))
+        self.assertFalse(self._contains_datastore_in_attribute(
+            fields['oracle_rac_registry_mount'], field_name))
+        self.assertFalse(self._contains_datastore_in_attribute(
+            fields['oracle_rac_database_mount'], field_name))
 
     @test.create_stubs({
         trove_api.trove: ('datastore_flavors', 'datastore_list',
@@ -264,7 +300,8 @@ class ClustersTests(test.TestCase):
             root_password=None,
             locality=None,
             availability_zone=IsA(six.text_type),
-            region=None
+            region=None,
+            extended_properties=None
         ).AndReturn(self.trove_clusters.first())
 
         field_name = self._build_flavor_widget_name(cluster_datastore,
@@ -331,7 +368,8 @@ class ClustersTests(test.TestCase):
             root_password=None,
             locality=None,
             availability_zone=IsA(six.text_type),
-            region=None
+            region=None,
+            extended_properties=None
         ).AndReturn(self.trove_clusters.first())
 
         field_name = self._build_flavor_widget_name(cluster_datastore,

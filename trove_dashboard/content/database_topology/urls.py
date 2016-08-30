@@ -1,3 +1,4 @@
+# Copyright 2016 Tesora Inc.
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
 #    not use this file except in compliance with the License. You may obtain
@@ -11,13 +12,17 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-from horizon.test.settings import *  # noqa
-from openstack_dashboard.test.settings import *  # noqa
+from django.conf.urls import patterns
+from django.conf.urls import url
 
-INSTALLED_APPS = list(INSTALLED_APPS)
-INSTALLED_APPS.append('trove_dashboard.content.database_backups')
-INSTALLED_APPS.append('trove_dashboard.content.database_clusters')
-INSTALLED_APPS.append('trove_dashboard.content.database_configurations')
-INSTALLED_APPS.append('trove_dashboard.content.database_datastores')
-INSTALLED_APPS.append('trove_dashboard.content.database_topology')
-INSTALLED_APPS.append('trove_dashboard.content.databases')
+from trove_dashboard.content.database_topology import views
+
+REPLICAS = r'^(?P<instance_id>[^/]+)/%s$'
+
+urlpatterns = patterns(
+    '',
+    url(r'^$', views.IndexView.as_view(), name='index'),
+    url(REPLICAS % 'replicas',
+        views.ViewReplicas.as_view(),
+        name='replicas'),
+)

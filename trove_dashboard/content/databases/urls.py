@@ -17,6 +17,7 @@ from django.conf.urls import patterns
 from django.conf.urls import url
 
 from trove_dashboard.content.databases.logs import urls as logs_urls
+from trove_dashboard.content.databases.schedules import urls as schedules_urls
 from trove_dashboard.content.databases.upgrade import urls as upgrade_urls
 from trove_dashboard.content.databases import views
 
@@ -54,6 +55,8 @@ urlpatterns = patterns(
     url(INSTANCES % 'manage_root', views.ManageRootView.as_view(),
         name='manage_root'),
     url(BASEINSTANCES % 'logs/', include(logs_urls, namespace='logs')),
+    url(BASEINSTANCES % 'schedules/',
+        include(schedules_urls, namespace='schedules')),
     url(BASEINSTANCES % 'upgrade/',
         include(upgrade_urls, namespace='upgrade')),
 )

@@ -15,13 +15,18 @@
 import logging
 
 from django.conf import settings
-from troveclient.v1 import client
+
+from horizon.utils import functions as utils
+from horizon.utils.memoized import memoized  # noqa
+
+from mistralclient.api import client as mistral_client
 
 from openstack_auth import utils as auth_utils
 from openstack_dashboard.api import base
 
-from horizon.utils import functions as utils
-from horizon.utils.memoized import memoized  # noqa
+from troveclient.common import Paginated
+from troveclient.v1 import client
+
 
 LOG = logging.getLogger(__name__)
 
@@ -43,6 +48,20 @@ def troveclient(request):
     return c
 
 
+@memoized
+def mistralclient(request):
+    auth_url = getattr(settings, 'OPENSTACK_KEYSTONE_URL', None)
+    cacert = getattr(settings, 'OPENSTACK_SSL_CACERT', None)
+    insecure = getattr(settings, 'OPENSTACK_SSL_NO_VERIFY', False)
+    return mistral_client.client(username=request.user.username,
+                                 auth_token=request.user.token.id,
+                                 project_id=request.user.tenant_id,
+                                 auth_url=auth_url,
+                                 service_type='workflowv2',
+                                 cacert=cacert,
+                                 insecure=insecure)
+
+
 def cluster_list(request, marker=None):
     page_size = utils.get_page_size(request)
     return troveclient(request).clusters.list(limit=page_size, marker=marker)
@@ -59,7 +78,8 @@ def cluster_delete(request, cluster_id):
 def cluster_create(request, name, volume, flavor, num_instances,
                    datastore, datastore_version,
                    nics=None, root_password=None, locality=None,
-                   availability_zone=None, region=None):
+                   availability_zone=None, region=None,
+                   extended_properties=None):
     instances = []
     for i in range(num_instances):
         instance = {}
@@ -80,7 +100,9 @@ def cluster_create(request, name, volume, flavor, num_instances,
         datastore,
         datastore_version,
         instances=instances,
-        locality=locality)
+        locality=locality,
+        extended_properties=extended_properties
+    )
 
 
 def cluster_grow(request, cluster_id, new_instances):
@@ -121,6 +143,41 @@ def create_cluster_root(request, cluster_id, password):
 def instance_list(request, marker=None):
     page_size = utils.get_page_size(request)
     return troveclient(request).instances.list(limit=page_size, marker=marker)
+
+
+def instance_list_all(request):
+    instances = instance_list(request)
+    marker = instances.next
+    while marker:
+        temp_instances = instance_list(request, marker=marker)
+        marker = temp_instances.next
+        instances.items += temp_instances.items
+        instances.links = temp_instances.links
+    instances.next = None
+    return instances
+
+
+def instance_list_master(request, marker=None):
+    page_size = utils.get_page_size(request)
+    master_instances = []
+    new_marker = marker
+    while len(master_instances) < page_size:
+        instances = instance_list(request, marker=new_marker)
+        for instance in instances:
+            if hasattr(instance, 'replicas'):
+                master_instances.append(instance)
+            if len(master_instances) >= page_size:
+                break
+        if len(master_instances) >= page_size:
+            new_marker = instance.id
+            break
+        new_marker = instances.next
+        if not new_marker:
+            break
+
+    paginated_instances = Paginated(items=master_instances,
+                                    next_marker=new_marker)
+    return paginated_instances
 
 
 def instance_get(request, instance_id):
@@ -218,8 +275,14 @@ def database_delete(request, instance_id, db_name):
     return troveclient(request).databases.delete(instance_id, db_name)
 
 
-def backup_list(request):
-    return troveclient(request).backups.list()
+def backup_list(request, limit=None, marker=None, datastore=None):
+    if limit:
+        page_size = limit
+    else:
+        page_size = utils.get_page_size(request)
+    return troveclient(request).backups.list(limit=page_size,
+                                             marker=marker,
+                                             datastore=datastore)
 
 
 def backup_get(request, backup_id):
@@ -433,3 +496,48 @@ def log_tail(request, instance_id, log_name, publish, lines, swift=None):
 
 def region_list(request):
     return auth_utils.get_user(request).available_services_regions
+
+
+def execution_delete(request, execution, mistral_client=None):
+    return troveclient(request).backups.execution_delete(
+        execution, mistral_client=mistral_client)
+
+
+def execution_list(request, schedule, mistral_client=None, marker=''):
+    if marker is None:
+        marker = ''
+    page_size = utils.get_page_size(request)
+    executions = list(troveclient(request).backups.execution_list(
+        schedule, mistral_client=mistral_client,
+        limit=page_size + 1, marker=marker))
+
+    has_more_data = False
+    if len(executions) > page_size:
+        executions.pop(-1)
+        has_more_data = True
+    elif len(executions) == getattr(settings, 'API_RESULT_LIMIT',
+                                              1000):
+        has_more_data = True
+    return (executions, has_more_data)
+
+
+def schedule_create(request, instance, pattern, name, description=None,
+                    mistral_client=None):
+    return troveclient(request).backups.schedule_create(
+        instance, pattern, name, description=description,
+        mistral_client=mistral_client)
+
+
+def schedule_delete(request, schedule, mistral_client=None):
+    return troveclient(request).backups.schedule_delete(
+        schedule, mistral_client=mistral_client)
+
+
+def schedule_list(request, instance, mistral_client=None):
+    return troveclient(request).backups.schedule_list(
+        instance, mistral_client=mistral_client)
+
+
+def schedule_show(request, schedule, mistral_client=None):
+    return troveclient(request).backups.schedule_show(
+        schedule, mistral_client=mistral_client)

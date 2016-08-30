@@ -37,7 +37,7 @@ RESTORE_URL = reverse('horizon:project:databases:launch')
 class DatabasesBackupsTests(test.TestCase):
     @test.create_stubs({api.trove: ('backup_list', 'instance_get')})
     def test_index(self):
-        api.trove.backup_list(IsA(http.HttpRequest))\
+        api.trove.backup_list(IsA(http.HttpRequest), marker=None)\
             .AndReturn(self.database_backups.list())
 
         api.trove.instance_get(IsA(http.HttpRequest),
@@ -65,9 +65,9 @@ class DatabasesBackupsTests(test.TestCase):
         self.assertEqual(res.status_code, 200)
         self.assertMessageCount(res, error=1)
 
-    @test.create_stubs({api.trove: ('instance_list',
-                                    'backup_list',
-                                    'backup_create')})
+    @test.create_stubs({
+        api.trove: ('instance_list', 'backup_list', 'backup_create'),
+    })
     def test_launch_backup(self):
         api.trove.instance_list(IsA(http.HttpRequest))\
             .AndReturn(self.databases.list())
@@ -98,7 +98,9 @@ class DatabasesBackupsTests(test.TestCase):
         self.assertNoFormErrors(res)
         self.assertRedirectsNoFollow(res, INDEX_URL)
 
-    @test.create_stubs({api.trove: ('instance_list', 'backup_list')})
+    @test.create_stubs({
+        api.trove: ('instance_list', 'backup_list'),
+    })
     def test_launch_backup_exception(self):
         api.trove.instance_list(IsA(http.HttpRequest))\
             .AndRaise(self.exceptions.trove)
@@ -112,9 +114,9 @@ class DatabasesBackupsTests(test.TestCase):
         self.assertTemplateUsed(res,
                                 'project/database_backups/backup.html')
 
-    @test.create_stubs({api.trove: ('instance_list',
-                                    'backup_list',
-                                    'backup_create')})
+    @test.create_stubs({
+        api.trove: ('instance_list', 'backup_list', 'backup_create'),
+    })
     def test_launch_backup_incr(self):
         api.trove.instance_list(IsA(http.HttpRequest)) \
             .AndReturn(self.databases.list())
@@ -196,13 +198,14 @@ class DatabasesBackupsTests(test.TestCase):
                     'datastore_flavors', 'datastore_list',
                     'datastore_version_list', 'datastore_volume_types',
                     'instance_list', 'region_list'),
+        dash_api.neutron: ('network_list_for_tenant',),
         dash_api.nova: ('availability_zone_list',),
     })
     def test_restore_backup(self):
         backup = self.database_backups.first()
         api.trove.backup_get(IsA(http.HttpRequest), IsA(six.text_type)) \
             .AndReturn(self.database_backups.first())
-        api.trove.backup_list(IsA(http.HttpRequest)).AndReturn(
+        api.trove.backup_list(IsA(http.HttpRequest), marker=None).AndReturn(
             self.database_backups.list())
         api.trove.configuration_list(IsA(http.HttpRequest)) \
             .AndReturn(self.database_configurations.list())
@@ -223,6 +226,9 @@ class DatabasesBackupsTests(test.TestCase):
             .AndReturn(common.Paginated(self.databases.list()))
         api.trove.region_list(IsA(http.HttpRequest))\
             .AndReturn([])
+        dash_api.neutron.network_list_for_tenant(IsA(http.HttpRequest),
+                                                 IsA(six.string_types)).\
+            AndReturn(self.networks.list()[:1])
         dash_api.nova.availability_zone_list(IsA(http.HttpRequest)) \
             .AndReturn(self.availability_zones.list())
         self.mox.ReplayAll()

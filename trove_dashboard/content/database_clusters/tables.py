@@ -35,8 +35,6 @@ from trove_dashboard.content.databases import db_capability
 
 LOG = logging.getLogger(__name__)
 
-ACTIVE_STATES = ("ACTIVE",)
-
 
 class DeleteCluster(tables.BatchAction):
     name = "delete"

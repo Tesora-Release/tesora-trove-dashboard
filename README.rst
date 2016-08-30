@@ -51,6 +51,17 @@ apache.::
 If you set COMPRESS_ENABLED and COMPRESS_OFFLINE to False in local_settings.py
 that allows you to bypass the compress and collectstatic as well.
 
+
+Settings
+~~~~~~~~
+
+The following optional settings provide a way to override the default
+volume sizes provided in the new instance and new cluster dialogs:
+
+* ``TROVE_DEFAULT_CLUSTER_VOL_SIZE``
+* ``TROVE_DEFAULT_VOL_SIZE``
+
+
 NOTE:
 =====
 

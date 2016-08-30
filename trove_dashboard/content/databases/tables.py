@@ -15,7 +15,6 @@
 from django.conf import settings
 from django.core import urlresolvers
 from django.template import defaultfilters as d_filters
-from django.utils.translation import pgettext_lazy
 from django.utils.translation import ugettext_lazy as _
 from django.utils.translation import ungettext_lazy
 
@@ -28,11 +27,11 @@ from horizon.utils import filters
 from trove_dashboard import api
 from trove_dashboard.content.database_backups \
     import tables as backup_tables
+from trove_dashboard.content.databases.schedules \
+    import tables as schedules_tables
 from trove_dashboard.content.databases.upgrade \
     import tables as upgrade_tables
-
-
-ACTIVE_STATES = ("ACTIVE",)
+from trove_dashboard.content import utils as database_utils
 
 
 class DeleteInstance(tables.BatchAction):
@@ -86,7 +85,7 @@ class RestartInstance(tables.BatchAction):
     classes = ('btn-danger', 'btn-reboot')
 
     def allowed(self, request, instance=None):
-        return ((instance.status in ACTIVE_STATES
+        return ((instance.status in database_utils.ACTIVE_STATES
                  or instance.status == 'SHUTDOWN'
                  or instance.status == 'RESTART_REQUIRED'))
 
@@ -115,7 +114,7 @@ class DetachReplica(tables.BatchAction):
     classes = ('btn-danger', 'btn-detach-replica')
 
     def allowed(self, request, instance=None):
-        return (instance.status in ACTIVE_STATES
+        return (instance.status in database_utils.ACTIVE_STATES
                 and hasattr(instance, 'replica_of'))
 
     def action(self, request, obj_id):
@@ -129,10 +128,23 @@ class PromoteToReplicaSource(tables.LinkAction):
     classes = ("ajax-modal", "btn-promote-to-replica-source")
 
     def allowed(self, request, instance=None):
-        return (instance.status in ACTIVE_STATES
+        return (instance.status in database_utils.ACTIVE_STATES
                 and hasattr(instance, 'replica_of'))
 
     def get_link_url(self, datum):
+        instance_id = self.table.get_object_id(datum)
+        return urlresolvers.reverse(self.url, args=[instance_id])
+
+
+class ViewReplicas(tables.LinkAction):
+    name = "view_replicas"
+    verbose_name = _("View Replicas")
+    url = "horizon:project:database_topology:replicas"
+
+    def allowed(self, request, instance):
+        return hasattr(instance, 'replicas')
+
+    def get_link_url(self, datum=None):
         instance_id = self.table.get_object_id(datum)
         return urlresolvers.reverse(self.url, args=[instance_id])
 
@@ -257,7 +269,7 @@ class ManageAccess(tables.LinkAction):
 
     def allowed(self, request, instance=None):
         instance = self.table.kwargs['instance']
-        return (instance.status in ACTIVE_STATES and
+        return (instance.status in database_utils.ACTIVE_STATES and
                 has_user_add_perm(request))
 
     def get_link_url(self, datum):
@@ -276,7 +288,7 @@ class CreateUser(tables.LinkAction):
 
     def allowed(self, request, instance=None):
         instance = self.table.kwargs['instance']
-        return (instance.status in ACTIVE_STATES and
+        return (instance.status in database_utils.ACTIVE_STATES and
                 has_user_add_perm(request))
 
     def get_link_url(self, datum=None):
@@ -293,7 +305,7 @@ class EditUser(tables.LinkAction):
 
     def allowed(self, request, instance=None):
         instance = self.table.kwargs['instance']
-        return (instance.status in ACTIVE_STATES and
+        return (instance.status in database_utils.ACTIVE_STATES and
                 has_user_add_perm(request))
 
     def get_link_url(self, datum):
@@ -342,7 +354,7 @@ class CreateDatabase(tables.LinkAction):
 
     def allowed(self, request, database=None):
         instance = self.table.kwargs['instance']
-        return (instance.status in ACTIVE_STATES and
+        return (instance.status in database_utils.ACTIVE_STATES and
                 has_database_add_perm(request))
 
     def get_link_url(self, datum=None):
@@ -399,7 +411,7 @@ class CreateBackup(tables.LinkAction):
     icon = "camera"
 
     def allowed(self, request, instance=None):
-        return (instance.status in ACTIVE_STATES and
+        return (instance.status in database_utils.ACTIVE_STATES and
                 request.user.has_perm('openstack.services.object-store'))
 
     def get_link_url(self, datam):
@@ -414,7 +426,7 @@ class ResizeVolume(tables.LinkAction):
     classes = ("ajax-modal", "btn-resize")
 
     def allowed(self, request, instance=None):
-        return instance.status in ACTIVE_STATES
+        return instance.status in database_utils.ACTIVE_STATES
 
     def get_link_url(self, datum):
         instance_id = self.table.get_object_id(datum)
@@ -428,7 +440,7 @@ class ResizeInstance(tables.LinkAction):
     classes = ("ajax-modal", "btn-resize")
 
     def allowed(self, request, instance=None):
-        return ((instance.status in ACTIVE_STATES
+        return ((instance.status in database_utils.ACTIVE_STATES
                  or instance.status == 'SHUTOFF'))
 
     def get_link_url(self, datum):
@@ -443,7 +455,7 @@ class AttachConfiguration(tables.LinkAction):
     classes = ("btn-attach-config", "ajax-modal")
 
     def allowed(self, request, instance=None):
-        return (instance.status in ACTIVE_STATES
+        return (instance.status in database_utils.ACTIVE_STATES
                 and not hasattr(instance, 'configuration'))
 
 
@@ -468,7 +480,7 @@ class DetachConfiguration(tables.BatchAction):
     classes = ('btn-danger', 'btn-detach-config')
 
     def allowed(self, request, instance=None):
-        return (instance.status in ACTIVE_STATES and
+        return (instance.status in database_utils.ACTIVE_STATES and
                 hasattr(instance, 'configuration'))
 
     def action(self, request, obj_id):
@@ -512,7 +524,7 @@ class ManageRoot(tables.LinkAction):
     url = "horizon:project:databases:manage_root"
 
     def allowed(self, request, instance):
-        return instance.status in ACTIVE_STATES
+        return instance.status in database_utils.ACTIVE_STATES
 
     def get_link_url(self, datum=None):
         instance_id = self.table.get_object_id(datum)
@@ -595,41 +607,6 @@ def get_databases(user):
 
 
 class InstancesTable(tables.DataTable):
-    STATUS_CHOICES = (
-        ("ACTIVE", True),
-        ("BLOCKED", True),
-        ("BUILD", None),
-        ("FAILED", False),
-        ("REBOOT", None),
-        ("RESIZE", None),
-        ("BACKUP", None),
-        ("SHUTDOWN", False),
-        ("ERROR", False),
-        ("RESTART_REQUIRED", None),
-    )
-    STATUS_DISPLAY_CHOICES = (
-        ("ACTIVE", pgettext_lazy("Current status of a Database Instance",
-                                 u"Active")),
-        ("BLOCKED", pgettext_lazy("Current status of a Database Instance",
-                                  u"Blocked")),
-        ("BUILD", pgettext_lazy("Current status of a Database Instance",
-                                u"Build")),
-        ("FAILED", pgettext_lazy("Current status of a Database Instance",
-                                 u"Failed")),
-        ("REBOOT", pgettext_lazy("Current status of a Database Instance",
-                                 u"Reboot")),
-        ("RESIZE", pgettext_lazy("Current status of a Database Instance",
-                                 u"Resize")),
-        ("BACKUP", pgettext_lazy("Current status of a Database Instance",
-                                 u"Backup")),
-        ("SHUTDOWN", pgettext_lazy("Current status of a Database Instance",
-                                   u"Shutdown")),
-        ("ERROR", pgettext_lazy("Current status of a Database Instance",
-                                u"Error")),
-        ("RESTART_REQUIRED",
-         pgettext_lazy("Current status of a Database Instance",
-                       u"Restart Required")),
-    )
     name = tables.Column("name",
                          link="horizon:project:databases:detail",
                          verbose_name=_("Instance Name"))
@@ -647,8 +624,9 @@ class InstancesTable(tables.DataTable):
     status = tables.Column("status",
                            verbose_name=_("Status"),
                            status=True,
-                           status_choices=STATUS_CHOICES,
-                           display_choices=STATUS_DISPLAY_CHOICES)
+                           status_choices=database_utils.STATUS_CHOICES,
+                           display_choices=(database_utils.
+                                            STATUS_DISPLAY_CHOICES))
 
     class Meta(object):
         name = "databases"
@@ -664,8 +642,10 @@ class InstancesTable(tables.DataTable):
                        PromoteToReplicaSource,
                        EjectReplicaSource,
                        DetachReplica,
+                       ViewReplicas,
                        ManageRoot,
                        upgrade_tables.UpgradeInstanceAction,
+                       schedules_tables.ViewSchedules,
                        RestartInstance,
                        DeleteInstance)
 

@@ -60,7 +60,7 @@ class LaunchForm(forms.SelfHandlingForm):
     volume = forms.IntegerField(
         label=_("Volume Size"),
         min_value=0,
-        initial=1,
+        initial=getattr(settings, "TROVE_DEFAULT_CLUSTER_VOL_SIZE", 1),
         help_text=_("Size of the volume in GB."))
     region = forms.ChoiceField(
         label=_("Region"),
@@ -113,6 +113,56 @@ class LaunchForm(forms.SelfHandlingForm):
             'class': 'switched',
             'data-switch-on': 'datastore',
         }))
+    oracle_rac_database = forms.CharField(
+        label=_("Database"),
+        required=False,
+        help_text=_("Specify the name of the initial database."),
+        widget=forms.TextInput(attrs={
+            'class': 'switched',
+            'data-switch-on': 'datastore',
+        }))
+    oracle_rac_subnet = forms.CharField(
+        label=_("Subnet"),
+        required=False,
+        help_text=_("Subnet of the cluster."),
+        widget=forms.TextInput(attrs={
+            'class': 'switched',
+            'data-switch-on': 'datastore',
+        }))
+    oracle_rac_storage_type = forms.CharField(
+        label=_("Storage Type"),
+        initial='nfs',
+        required=False,
+        help_text=_("Storage type of cluster. (Read only)"),
+        widget=forms.TextInput(attrs={
+            'readonly': 'readonly',
+            'class': 'switched',
+            'data-switch-on': 'datastore',
+        }))
+    oracle_rac_votedisk_mount = forms.CharField(
+        label=_("Voting Files Disk Mount"),
+        required=False,
+        help_text=_("Specify the voting files disk mount."),
+        widget=forms.TextInput(attrs={
+            'class': 'switched',
+            'data-switch-on': 'datastore',
+        }))
+    oracle_rac_registry_mount = forms.CharField(
+        label=_("Registry Mount"),
+        required=False,
+        help_text=_("Specify the registry mount."),
+        widget=forms.TextInput(attrs={
+            'class': 'switched',
+            'data-switch-on': 'datastore',
+        }))
+    oracle_rac_database_mount = forms.CharField(
+        label=_("Database Mount"),
+        required=False,
+        help_text=_("Specify the database mount."),
+        widget=forms.TextInput(attrs={
+            'class': 'switched',
+            'data-switch-on': 'datastore',
+        }))
 
     # (name of field variable, label)
     default_fields = [
@@ -120,6 +170,14 @@ class LaunchForm(forms.SelfHandlingForm):
     ]
     mongodb_fields = default_fields + [
         ('num_shards', _('Number of Shards')),
+    ]
+    oracle_rac_fields = default_fields + [
+        ('oracle_rac_database', _('Database')),
+        ('oracle_rac_subnet', _('Subnet')),
+        ('oracle_rac_storage_type', _('Storage Type')),
+        ('oracle_rac_votedisk_mount', _('Voting Files Disk Mount')),
+        ('oracle_rac_registry_mount', _('Registry Mount')),
+        ('oracle_rac_database_mount', _('Database Mount'))
     ]
     vertica_fields = [
         ('num_instances_vertica', ('Number of Instances')),
@@ -166,6 +224,33 @@ class LaunchForm(forms.SelfHandlingForm):
                     if int(self.data.get("num_shards", 0)) < 1:
                         msg = _("The number of shards must be greater than 1.")
                         self._errors["num_shards"] = self.error_class([msg])
+
+                if db_capability.is_oracle_rac_datastore(datastore):
+                    if not self.data.get("oracle_rac_database", None):
+                        msg = _("Database must be specified.")
+                        self._errors["oracle_rac_database"] = (
+                            self.error_class([msg])
+                        )
+                    if not self.data.get("oracle_rac_subnet", None):
+                        msg = _("Subnet must be specified.")
+                        self._errors["oracle_rac_subnet"] = (
+                            self.error_class([msg])
+                        )
+                    if not self.data.get("oracle_rac_votedisk_mount", None):
+                        msg = _("Voting Files Disk Mount must be specified.")
+                        self._errors["oracle_rac_votedisk_mount"] = (
+                            self.error_class([msg])
+                        )
+                    if not self.data.get("oracle_rac_registry_mount", None):
+                        msg = _("Registry mount must be specified.")
+                        self._errors["oracle_rac_registry_mount"] = (
+                            self.error_class([msg])
+                        )
+                    if not self.data.get("oracle_rac_database_mount", None):
+                        msg = _("Database mount must be specified.")
+                        self._errors["oracle_rac_database_mount"] = (
+                            self.error_class([msg])
+                        )
 
         if not self.data.get("locality", None):
             self.cleaned_data["locality"] = None
@@ -361,6 +446,8 @@ class LaunchForm(forms.SelfHandlingForm):
             fields = self.mongodb_fields
         elif db_capability.is_vertica_datastore(datastore):
             fields = self.vertica_fields
+        elif db_capability.is_oracle_rac_datastore(datastore):
+            fields = self.oracle_rac_fields
         else:
             fields = self.default_fields
 
@@ -382,6 +469,28 @@ class LaunchForm(forms.SelfHandlingForm):
             region = data['region']
         return region
 
+    def _build_extended_properties(self, data, datastore):
+        extended_properties = None
+
+        if db_capability.is_oracle_rac_datastore(datastore):
+            extended_properties = {}
+            extended_properties['database'] = data['oracle_rac_database']
+            extended_properties['votedisk_mount'] = (
+                data['oracle_rac_votedisk_mount']
+            )
+            extended_properties['registry_mount'] = (
+                data['oracle_rac_registry_mount']
+            )
+            extended_properties['database_mount'] = (
+                data['oracle_rac_database_mount']
+            )
+            extended_properties['subnet'] = data['oracle_rac_subnet']
+            extended_properties['storage_type'] = (
+                data['oracle_rac_storage_type']
+            )
+
+        return extended_properties
+
     @sensitive_variables('data')
     def handle(self, request, data):
         try:
@@ -398,6 +507,8 @@ class LaunchForm(forms.SelfHandlingForm):
             if db_capability.is_vertica_datastore(datastore):
                 root_password = data['root_password']
                 num_instances = data['num_instances_vertica']
+            extended_properties = self._build_extended_properties(data,
+                                                                  datastore)
             LOG.info("Launching cluster with parameters "
                      "{name=%s, volume=%s, flavor=%s, "
                      "datastore=%s, datastore_version=%s,"
@@ -417,7 +528,10 @@ class LaunchForm(forms.SelfHandlingForm):
                                            root_password=root_password,
                                            locality=self._get_locality(data),
                                            availability_zone=avail_zone,
-                                           region=self._get_region(data))
+                                           region=self._get_region(data),
+                                           extended_properties=(
+                                               extended_properties
+                                           ))
             messages.success(request,
                              _('Launched cluster "%s"') % data['name'])
             return True

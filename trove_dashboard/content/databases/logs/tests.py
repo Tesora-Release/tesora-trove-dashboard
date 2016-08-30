@@ -49,7 +49,7 @@ class LogsTests(test.TestCase):
 
     @test.create_stubs({
         api.trove: ('datastore_version_list', 'flavor_get',
-                    'instance_get', 'log_list',)})
+                    'instance_get', 'log_list', 'root_show')})
     def test_log_tab(self):
         database = self.databases.first()
         database_id = database.id
@@ -62,6 +62,8 @@ class LogsTests(test.TestCase):
             .AndReturn(self.logs.list()))
         (api.trove.flavor_get(IsA(http.HttpRequest), database.flavor["id"])
             .AndReturn(self.flavors.first()))
+        (api.trove.root_show(IsA(http.HttpRequest), IsA(str))
+            .AndReturn(self.database_user_roots.first()))
 
         self.mox.ReplayAll()
 
@@ -76,7 +78,7 @@ class LogsTests(test.TestCase):
 
     @test.create_stubs({
         api.trove: ('datastore_version_list', 'flavor_get',
-                    'instance_get', 'log_list',)})
+                    'instance_get', 'log_list', 'root_show')})
     def test_log_tab_exception(self):
         database = self.databases.first()
         database_id = database.id
@@ -89,6 +91,8 @@ class LogsTests(test.TestCase):
             .AndRaise(self.exceptions.trove))
         (api.trove.flavor_get(IsA(http.HttpRequest), database.flavor["id"])
             .AndReturn(self.flavors.first()))
+        (api.trove.root_show(IsA(http.HttpRequest), IsA(str))
+            .AndReturn(self.database_user_roots.first()))
 
         self.mox.ReplayAll()
 
