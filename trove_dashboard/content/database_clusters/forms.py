@@ -13,7 +13,6 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-import binascii
 import logging
 import uuid
 
@@ -34,8 +33,7 @@ from trove_dashboard import api as trove_api
 from trove_dashboard.content.database_clusters \
     import cluster_manager
 from trove_dashboard.content.databases import db_capability
-from trove_dashboard.content.databases.workflows \
-    import create_instance
+from trove_dashboard.content import utils
 
 LOG = logging.getLogger(__name__)
 
@@ -74,6 +72,10 @@ class LaunchForm(forms.SelfHandlingForm):
         help_text=_("Specify whether instances in the cluster will "
                     "be created on the same hypervisor (affinity) or on "
                     "different hypervisors (anti-affinity)."))
+    instance_type = forms.CharField(
+        label=_("Type"),
+        required=False,
+        help_text=_("Cluster node type"))
     root_password = forms.CharField(
         label=_("Root Password"),
         required=False,
@@ -202,10 +204,9 @@ class LaunchForm(forms.SelfHandlingForm):
         datastore_field_value = self.data.get("datastore", None)
         if datastore_field_value:
             datastore, datastore_version = (
-                create_instance.parse_datastore_and_version_text(
-                    binascii.unhexlify(datastore_field_value)))
+                utils.parse_datastore_and_version_text(datastore_field_value))
 
-            flavor_field_name = self._build_widget_field_name(
+            flavor_field_name = utils.build_widget_field_name(
                 datastore, datastore_version)
             if not self.data.get(flavor_field_name, None):
                 msg = _("The flavor must be specified.")
@@ -375,9 +376,9 @@ class LaunchForm(forms.SelfHandlingForm):
                     for v in versions:
                         if hasattr(v, 'active') and not v.active:
                             continue
-                        selection_text = self._build_datastore_display_text(
+                        selection_text = utils.build_datastore_display_text(
                             ds.name, v.name)
-                        widget_text = self._build_widget_field_name(
+                        widget_text = utils.build_widget_field_name(
                             ds.name, v.name)
                         version_choices = (version_choices +
                                            ((widget_text, selection_text),))
@@ -396,7 +397,7 @@ class LaunchForm(forms.SelfHandlingForm):
                                     request,
                                     datastore,
                                     datastore_version):
-        name = self._build_widget_field_name(datastore, datastore_version)
+        name = utils.build_widget_field_name(datastore, datastore_version)
         attr_key = 'data-datastore-' + name
         field = forms.ChoiceField(
             label=_("Flavor"),
@@ -415,16 +416,6 @@ class LaunchForm(forms.SelfHandlingForm):
                 request, valid_flavors)
 
         return name, field
-
-    def _build_datastore_display_text(self, datastore, datastore_version):
-        return datastore + ' - ' + datastore_version
-
-    def _build_widget_field_name(self, datastore, datastore_version):
-        # Since the fieldnames cannot contain an uppercase character
-        # we generate a hex encoded string representation of the
-        # datastore and version as the fieldname
-        return binascii.hexlify(
-            self._build_datastore_display_text(datastore, datastore_version))
 
     def _insert_datastore_version_fields(self, datastore_flavor_fields):
         datastore_index = None
@@ -469,6 +460,12 @@ class LaunchForm(forms.SelfHandlingForm):
             region = data['region']
         return region
 
+    def _get_instance_type(self, data):
+        instance_type = None
+        if data.get('instance_type'):
+            instance_type = data['instance_type'].strip().split(",")
+        return instance_type
+
     def _build_extended_properties(self, data, datastore):
         extended_properties = None
 
@@ -496,10 +493,9 @@ class LaunchForm(forms.SelfHandlingForm):
         try:
             avail_zone = data.get('availability_zone', None)
             datastore, datastore_version = (
-                create_instance.parse_datastore_and_version_text(
-                    binascii.unhexlify(data['datastore'])))
+                utils.parse_datastore_and_version_text(data['datastore']))
 
-            flavor_field_name = self._build_widget_field_name(
+            flavor_field_name = utils.build_widget_field_name(
                 datastore, datastore_version)
             flavor = data[flavor_field_name]
             num_instances = data['num_instances']
@@ -512,10 +508,11 @@ class LaunchForm(forms.SelfHandlingForm):
             LOG.info("Launching cluster with parameters "
                      "{name=%s, volume=%s, flavor=%s, "
                      "datastore=%s, datastore_version=%s,"
-                     "locality=%s, AZ=%s, region=%s",
+                     "locality=%s, AZ=%s, region=%s, instance_type=%s",
                      data['name'], data['volume'], flavor,
                      datastore, datastore_version, self._get_locality(data),
-                     avail_zone, self._get_region(data))
+                     avail_zone, self._get_region(data),
+                     self._get_instance_type(data))
 
             trove_api.trove.cluster_create(request,
                                            data['name'],
@@ -529,6 +526,8 @@ class LaunchForm(forms.SelfHandlingForm):
                                            locality=self._get_locality(data),
                                            availability_zone=avail_zone,
                                            region=self._get_region(data),
+                                           instance_type=(
+                                               self._get_instance_type(data)),
                                            extended_properties=(
                                                extended_properties
                                            ))

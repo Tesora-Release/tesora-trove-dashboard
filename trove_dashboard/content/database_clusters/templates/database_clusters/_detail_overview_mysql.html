@@ -12,7 +12,7 @@
             {% else %}
                 <dd>{{ ip }}</dd>
                 <dt>{% trans "Connection Examples" %}</dt>
-                <dd>mysql {{ ip }} 3306</dd>
+                <dd>mysql -h {{ ip }} -u {% trans "USERNAME" %} -P 3306 -p</dd>
             {% endif %}
         {% endwith %}
     </dl>

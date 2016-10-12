@@ -61,6 +61,22 @@ volume sizes provided in the new instance and new cluster dialogs:
 * ``TROVE_DEFAULT_CLUSTER_VOL_SIZE``
 * ``TROVE_DEFAULT_VOL_SIZE``
 
+The following setting will ask the user to enter a database name when creating
+an instance with an Oracle datastore
+
+* ``TROVE_ENABLE_ORACLE_DATABASE_NAME_VALIDATION = True``
+
+The following setting provides a way to enable backup of a single instance of
+a cluster.  Set the value as a list of datastores names.
+For example, TROVE_CLUSTER_DATASTORES_ALLOWING_BACKUP = ["mongodb", "pxc"]
+
+* ``TROVE_CLUSTER_DATASTORES_ALLOWING_BACKUP``
+
+The following setting provides a way to enable specifying user roles for a
+datastore.  Set the value as a list of datastores names.
+For example, TROVE_ENABLE_USER_ROLES = ["couchbase"]
+
+* ``TROVE_ENABLE_USER_ROLES``
 
 NOTE:
 =====

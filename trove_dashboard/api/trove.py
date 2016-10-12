@@ -62,6 +62,42 @@ def mistralclient(request):
                                  insecure=insecure)
 
 
+def bucket_create(request, instance_id, name, password, bucket_ramsize=None,
+                  bucket_replica=None, enable_index_replica=None,
+                  bucket_eviction_policy=None, bucket_priority=None):
+    return user_create(request, instance_id, name, password,
+                       bucket_ramsize=bucket_ramsize,
+                       bucket_replica=bucket_replica,
+                       enable_index_replica=enable_index_replica,
+                       bucket_eviction_policy=bucket_eviction_policy,
+                       bucket_priority=bucket_priority)
+
+
+def bucket_delete(request, instance_id, name):
+    return user_delete(request, instance_id, name)
+
+
+def bucket_get(request, instance_id, name):
+    return user_get(request, instance_id, name)
+
+
+def bucket_list(request, instance_id):
+    return users_list(request, instance_id)
+
+
+def bucket_update(request, instance_id, name,
+                  new_password=None, bucket_ramsize=None, bucket_replica=None,
+                  enable_index_replica=None, bucket_eviction_policy=None,
+                  bucket_priority=None):
+    return user_update_attributes(
+        request, instance_id, name, new_password=new_password,
+        bucket_ramsize=bucket_ramsize,
+        bucket_replica=bucket_replica,
+        enable_index_replica=enable_index_replica,
+        bucket_eviction_policy=bucket_eviction_policy,
+        bucket_priority=bucket_priority)
+
+
 def cluster_list(request, marker=None):
     page_size = utils.get_page_size(request)
     return troveclient(request).clusters.list(limit=page_size, marker=marker)
@@ -75,10 +111,19 @@ def cluster_delete(request, cluster_id):
     return troveclient(request).clusters.delete(cluster_id)
 
 
+def cluster_force_delete(request, cluster_id):
+    cluster_reset_status(request, cluster_id)
+    return cluster_delete(request, cluster_id)
+
+
+def cluster_reset_status(request, cluster_id):
+    return troveclient(request).clusters.reset_status(cluster_id)
+
+
 def cluster_create(request, name, volume, flavor, num_instances,
                    datastore, datastore_version,
                    nics=None, root_password=None, locality=None,
-                   availability_zone=None, region=None,
+                   availability_zone=None, region=None, instance_type=None,
                    extended_properties=None):
     instances = []
     for i in range(num_instances):
@@ -92,6 +137,8 @@ def cluster_create(request, name, volume, flavor, num_instances,
             instance["availability_zone"] = availability_zone
         if region:
             instance["region"] = region
+        if instance_type:
+            instance["type"] = instance_type
         instances.append(instance)
 
     # TODO(saurabhs): vertica needs root password on cluster create
@@ -132,6 +179,11 @@ def cluster_shrink(request, cluster_id, instances):
     return troveclient(request).clusters.shrink(cluster_id, instances)
 
 
+def cluster_upgrade(request, cluster_id, datastore_version):
+    return troveclient(request).clusters.upgrade(cluster_id,
+                                                 datastore_version)
+
+
 def create_cluster_root(request, cluster_id, password):
     # It appears the code below depends on this trove change
     # https://review.openstack.org/#/c/166954/.  Comment out when that
@@ -140,16 +192,18 @@ def create_cluster_root(request, cluster_id, password):
     troveclient(request).root.create_cluster_root(cluster_id, password)
 
 
-def instance_list(request, marker=None):
+def instance_list(request, marker=None, include_clustered=False):
     page_size = utils.get_page_size(request)
-    return troveclient(request).instances.list(limit=page_size, marker=marker)
+    return troveclient(request).instances.list(
+        limit=page_size, marker=marker, include_clustered=include_clustered)
 
 
-def instance_list_all(request):
-    instances = instance_list(request)
+def instance_list_all(request, include_clustered=False):
+    instances = instance_list(request, include_clustered=include_clustered)
     marker = instances.next
     while marker:
-        temp_instances = instance_list(request, marker=marker)
+        temp_instances = instance_list(request, marker=marker,
+                                       include_clustered=include_clustered)
         marker = temp_instances.next
         instances.items += temp_instances.items
         instances.links = temp_instances.links
@@ -186,6 +240,15 @@ def instance_get(request, instance_id):
 
 def instance_delete(request, instance_id):
     return troveclient(request).instances.delete(instance_id)
+
+
+def instance_force_delete(request, instance_id):
+    instance_reset_status(request, instance_id)
+    return instance_delete(request, instance_id)
+
+
+def instance_reset_status(request, instance_id):
+    return troveclient(request).instances.reset_status(instance_id)
 
 
 def instance_create(request, name, volume, flavor, databases=None,
@@ -358,10 +421,26 @@ def users_list(request, instance_id):
 
 
 def user_create(request, instance_id, username, password,
-                host=None, databases=[]):
+                host=None, databases=[], roles=None,
+                # couchbase params
+                bucket_ramsize=None, bucket_replica=None,
+                enable_index_replica=False, bucket_eviction_policy=None,
+                bucket_priority=None
+                ):
     user = {'name': username, 'password': password, 'databases': databases}
     if host:
         user['host'] = host
+    if roles:
+        user['roles'] = roles
+    if bucket_ramsize:
+        user['bucket_ramsize'] = bucket_ramsize
+    if bucket_replica:
+        user['bucket_replica'] = bucket_replica
+    user['enable_index_replica'] = int(enable_index_replica)
+    if bucket_eviction_policy:
+        user['bucket_eviction_policy'] = bucket_eviction_policy
+    if bucket_priority:
+        user['bucket_priority'] = bucket_priority
 
     return troveclient(request).users.create(instance_id, [user])
 
@@ -370,8 +449,15 @@ def user_delete(request, instance_id, user, host=None):
     return troveclient(request).users.delete(instance_id, user, hostname=host)
 
 
+def user_get(request, instance_id, user_id, host=None):
+    return troveclient(request).users.get(instance_id, user_id, hostname=host)
+
+
 def user_update_attributes(request, instance_id, name, host=None,
-                           new_name=None, new_password=None, new_host=None):
+                           new_name=None, new_password=None, new_host=None,
+                           bucket_ramsize=None, bucket_replica=None,
+                           enable_index_replica=False,
+                           bucket_eviction_policy=None, bucket_priority=None):
     new_attributes = {}
     if new_name:
         new_attributes['name'] = new_name
@@ -379,6 +465,16 @@ def user_update_attributes(request, instance_id, name, host=None,
         new_attributes['password'] = new_password
     if new_host:
         new_attributes['host'] = new_host
+    if bucket_ramsize:
+        new_attributes['bucket_ramsize'] = bucket_ramsize
+    if bucket_replica:
+        new_attributes['bucket_replica'] = bucket_replica
+    new_attributes['enable_index_replica'] = int(enable_index_replica)
+    if bucket_eviction_policy:
+        new_attributes['bucket_eviction_policy'] = bucket_eviction_policy
+    if bucket_priority:
+        new_attributes['bucket_priority'] = bucket_priority
+
     return troveclient(request).users.update_attributes(
         instance_id, name, newuserattr=new_attributes, hostname=host)
 
@@ -522,10 +618,10 @@ def execution_list(request, schedule, mistral_client=None, marker=''):
 
 
 def schedule_create(request, instance, pattern, name, description=None,
-                    mistral_client=None):
+                    mistral_client=None, incremental=False):
     return troveclient(request).backups.schedule_create(
         instance, pattern, name, description=description,
-        mistral_client=mistral_client)
+        mistral_client=mistral_client, incremental=incremental)
 
 
 def schedule_delete(request, schedule, mistral_client=None):

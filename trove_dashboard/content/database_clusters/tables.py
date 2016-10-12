@@ -16,6 +16,7 @@
 
 import logging
 
+from django.conf import settings
 from django.core import urlresolvers
 from django import shortcuts
 from django.template.defaultfilters import title  # noqa
@@ -31,14 +32,18 @@ from horizon.utils import memoized
 
 from trove_dashboard import api
 from trove_dashboard.content.database_clusters import cluster_manager
+from trove_dashboard.content.database_clusters.couchbase import (
+    tables as couchbase_tables)
+from trove_dashboard.content.database_clusters.upgrade import (
+    tables as upgrade_tables)
 from trove_dashboard.content.databases import db_capability
+from trove_dashboard.content import utils as database_utils
 
 LOG = logging.getLogger(__name__)
 
 
-class DeleteCluster(tables.BatchAction):
+class DeleteCluster(tables.DeleteAction):
     name = "delete"
-    icon = "remove"
     classes = ('btn-danger',)
     help_text = _("Deleted cluster is not recoverable.")
 
@@ -58,8 +63,48 @@ class DeleteCluster(tables.BatchAction):
             count
         )
 
-    def action(self, request, obj_id):
+    def delete(self, request, obj_id):
         api.trove.cluster_delete(request, obj_id)
+
+
+class ForceDelete(tables.DeleteAction):
+    name = "force_delete_action"
+    verbose_name = _("Force Delete")
+    help_text = _("Force deleted instances are not recoverable.")
+
+    @staticmethod
+    def action_present(count):
+        return ungettext_lazy(
+            u"Force Delete Cluster",
+            u"Force Delete Clusters",
+            count
+        )
+
+    @staticmethod
+    def action_past(count):
+        return ungettext_lazy(
+            u"Scheduled forced deletion of Cluster",
+            u"Scheduled forced deletion of Clusters",
+            count
+        )
+
+    def delete(self, request, obj_id):
+        api.trove.cluster_force_delete(request, obj_id)
+
+
+class ResetStatus(tables.Action):
+    name = "reset_status_action"
+    verbose_name = _("Reset Status")
+    classes = ('btn-danger',)
+
+    def single(self, table, request, object_id):
+        try:
+            api.trove.cluster_reset_status(request, object_id)
+            messages.success(request,
+                             _("Successfully reset status of cluster."))
+        except Exception as e:
+            messages.warning(request,
+                             _("Cannot reset status: %s") % e.message)
 
 
 class LaunchLink(tables.LinkAction):
@@ -179,8 +224,9 @@ class ClustersTable(tables.DataTable):
         status_columns = ["task"]
         row_class = UpdateRow
         table_actions = (LaunchLink, DeleteCluster)
-        row_actions = (ClusterGrow, ClusterShrink, ResetPassword,
-                       DeleteCluster)
+        row_actions = (ClusterGrow, ClusterShrink,
+                       upgrade_tables.UpgradeCluster, ResetPassword,
+                       DeleteCluster, ResetStatus, ForceDelete)
 
 
 def get_instance_size(instance):
@@ -206,6 +252,30 @@ def get_host(instance):
     return _("Not Assigned")
 
 
+TROVE_CLUSTER_DATASTORES_ALLOWING_BACKUP = getattr(
+    settings, 'TROVE_CLUSTER_DATASTORES_ALLOWING_BACKUP', [])
+
+
+class CreateBackup(tables.LinkAction):
+    name = "backup"
+    verbose_name = _("Create Backup")
+    url = "horizon:project:database_backups:create"
+    classes = ("ajax-modal",)
+    icon = "camera"
+
+    def allowed(self, request, instance=None):
+        datastore = instance.datastore.get("type", None)
+        if datastore not in TROVE_CLUSTER_DATASTORES_ALLOWING_BACKUP:
+            return False
+
+        return (instance.status in database_utils.ACTIVE_STATES and
+                request.user.has_perm('openstack.services.object-store'))
+
+    def get_link_url(self, datum):
+        url = urlresolvers.reverse(self.url)
+        return url + "?instance=%s" % datum.id + "&include_clustered=True"
+
+
 class InstancesTable(tables.DataTable):
     name = tables.Column("name",
                          verbose_name=_("Name"))
@@ -223,6 +293,7 @@ class InstancesTable(tables.DataTable):
     class Meta(object):
         name = "instances"
         verbose_name = _("Instances")
+        row_actions = (CreateBackup, couchbase_tables.ManageBuckets,)
 
 
 class ClusterShrinkAction(tables.BatchAction):

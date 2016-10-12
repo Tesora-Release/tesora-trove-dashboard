@@ -16,6 +16,7 @@ from django.conf.urls import include
 from django.conf.urls import patterns
 from django.conf.urls import url
 
+from trove_dashboard.content.databases.couchbase import urls as couchbase_urls
 from trove_dashboard.content.databases.logs import urls as logs_urls
 from trove_dashboard.content.databases.schedules import urls as schedules_urls
 from trove_dashboard.content.databases.upgrade import urls as upgrade_urls
@@ -54,6 +55,8 @@ urlpatterns = patterns(
         name='attach_config'),
     url(INSTANCES % 'manage_root', views.ManageRootView.as_view(),
         name='manage_root'),
+    url(BASEINSTANCES % 'couchbase/',
+        include(couchbase_urls, namespace='couchbase')),
     url(BASEINSTANCES % 'logs/', include(logs_urls, namespace='logs')),
     url(BASEINSTANCES % 'schedules/',
         include(schedules_urls, namespace='schedules')),

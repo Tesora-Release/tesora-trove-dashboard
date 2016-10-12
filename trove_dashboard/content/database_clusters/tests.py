@@ -14,7 +14,6 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import binascii
 import logging
 import six
 
@@ -30,6 +29,7 @@ from trove_dashboard import api as trove_api
 from trove_dashboard.content.database_clusters \
     import cluster_manager
 from trove_dashboard.content.database_clusters import tables
+from trove_dashboard.content import utils
 from trove_dashboard.test import helpers as test
 
 INDEX_URL = reverse('horizon:project:database_clusters:index')
@@ -141,8 +141,8 @@ class ClustersTests(test.TestCase):
         datastore_version = '2.6'
         fields = self.launch_cluster_fields_setup(datastore,
                                                   datastore_version)
-        field_name = self._build_flavor_widget_name(datastore,
-                                                    datastore_version)
+        field_name = utils.build_widget_field_name(datastore,
+                                                   datastore_version)
 
         self.assertTrue(self._contains_datastore_in_attribute(
             fields[field_name], field_name))
@@ -172,8 +172,8 @@ class ClustersTests(test.TestCase):
         datastore_version = '3.0'
         fields = self.launch_cluster_fields_setup(datastore,
                                                   datastore_version)
-        field_name = self._build_flavor_widget_name(datastore,
-                                                    datastore_version)
+        field_name = utils.build_widget_field_name(datastore,
+                                                   datastore_version)
 
         self.assertTrue(self._contains_datastore_in_attribute(
             fields[field_name], field_name))
@@ -203,8 +203,8 @@ class ClustersTests(test.TestCase):
         datastore_version = '7.1'
         fields = self.launch_cluster_fields_setup(datastore,
                                                   datastore_version)
-        field_name = self._build_flavor_widget_name(datastore,
-                                                    datastore_version)
+        field_name = utils.build_widget_field_name(datastore,
+                                                   datastore_version)
 
         self.assertTrue(self._contains_datastore_in_attribute(
             fields[field_name], field_name))
@@ -301,11 +301,12 @@ class ClustersTests(test.TestCase):
             locality=None,
             availability_zone=IsA(six.text_type),
             region=None,
+            instance_type=None,
             extended_properties=None
         ).AndReturn(self.trove_clusters.first())
 
-        field_name = self._build_flavor_widget_name(cluster_datastore,
-                                                    cluster_datastore_version)
+        field_name = utils.build_widget_field_name(cluster_datastore,
+                                                   cluster_datastore_version)
         self.mox.ReplayAll()
         post = {
             'name': cluster_name,
@@ -369,11 +370,12 @@ class ClustersTests(test.TestCase):
             locality=None,
             availability_zone=IsA(six.text_type),
             region=None,
+            instance_type=None,
             extended_properties=None
         ).AndReturn(self.trove_clusters.first())
 
-        field_name = self._build_flavor_widget_name(cluster_datastore,
-                                                    cluster_datastore_version)
+        field_name = utils.build_widget_field_name(cluster_datastore,
+                                                   cluster_datastore_version)
         self.mox.ReplayAll()
         post = {
             'name': cluster_name,
@@ -434,8 +436,8 @@ class ClustersTests(test.TestCase):
             availability_zone=IsA(six.text_type)
         ).AndReturn(self.trove_clusters.first())
 
-        field_name = self._build_flavor_widget_name(cluster_datastore,
-                                                    cluster_datastore_version)
+        field_name = utils.build_widget_field_name(cluster_datastore,
+                                                   cluster_datastore_version)
         self.mox.ReplayAll()
         post = {
             'name': cluster_name,
@@ -735,10 +737,3 @@ class ClustersTests(test.TestCase):
             if datastore in key:
                 return True
         return False
-
-    def _build_datastore_display_text(self, datastore, datastore_version):
-        return datastore + ' - ' + datastore_version
-
-    def _build_flavor_widget_name(self, datastore, datastore_version):
-        return binascii.hexlify(self._build_datastore_display_text(
-            datastore, datastore_version))

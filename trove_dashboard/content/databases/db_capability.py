@@ -28,6 +28,7 @@ REDIS = "redis"
 VERTICA = "vertica"
 
 _mysql_compatible_datastores = (MYSQL, MARIA, PERCONA, PERCONA_CLUSTER)
+_oracle_compatible_datastores = (ORACLE, ORACLE_RA, ORACLE_RAC)
 _cluster_capable_datastores = (CASSANDRA, COUCHBASE, DSE, MARIA, MONGODB,
                                ORACLE_RAC, PERCONA_CLUSTER, REDIS, VERTICA)
 _cluster_grow_shrink_capable_datastores = (CASSANDRA, COUCHBASE, DSE, MARIA,
@@ -75,6 +76,10 @@ def is_mongodb_datastore(datastore):
 
 def is_mysql_compatible(datastore):
     return _is_datastore_in_list(datastore, _mysql_compatible_datastores)
+
+
+def is_oracle_compatible_datastore(datastore):
+    return _is_datastore_in_list(datastore, _oracle_compatible_datastores)
 
 
 def is_oracle_ra_datastore(datastore):

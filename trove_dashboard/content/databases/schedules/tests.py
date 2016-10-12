@@ -25,6 +25,7 @@ from mox3.mox import IsA  # noqa
 from troveclient import common
 
 from trove_dashboard import api
+from trove_dashboard.content.databases.schedules import tables
 from trove_dashboard.test import helpers as test
 
 
@@ -179,7 +180,8 @@ class ScheduleTests(test.TestCase):
                                    IsA(six.text_type),
                                    IsA(six.text_type),
                                    description=IsA(six.text_type),
-                                   mistral_client=self.stub_mistralclient())
+                                   mistral_client=self.stub_mistralclient(),
+                                   incremental=False)
             .AndReturn(new_schedule))
 
         self.mox.ReplayAll()
@@ -191,7 +193,8 @@ class ScheduleTests(test.TestCase):
             'instance_id': 'id',
             'name': 'backup1',
             'pattern': '* * 0 * *',
-            'description': 'This is the backup1 schedule'
+            'description': 'This is the backup1 schedule',
+            'incremental': False
         }
 
         res = self.client.post(url, post)
@@ -260,3 +263,44 @@ class ScheduleTests(test.TestCase):
         form_data = {'action': action_string}
         res = self.client.post(EXECUTIONS_URL, form_data)
         self.assertRedirectsNoFollow(res, EXECUTIONS_URL)
+
+    @test.create_stubs({
+        api.trove: ('schedule_create',)
+    })
+    def test_incremental_schedule(self):
+        new_schedule = {
+            "name": "incrementalBackup",
+            "pattern": "* * 0 * *",
+            "description": "This is the backup schedule with incremental",
+        }
+
+        (api.trove.schedule_create(IsA(http.HttpRequest),
+                                   IsA(six.text_type),
+                                   IsA(six.text_type),
+                                   IsA(six.text_type),
+                                   description=IsA(six.text_type),
+                                   mistral_client=self.stub_mistralclient(),
+                                   incremental=True)
+         .AndReturn(new_schedule))
+
+        self.mox.ReplayAll()
+
+        url = reverse('horizon:project:databases:schedules:create_schedule',
+                      args=['id'])
+        post = {
+            'method': 'CreateScheduleForm',
+            'instance_id': 'id',
+            'name': 'backup1',
+            'pattern': '* * 0 * *',
+            'description': 'This is the backup schedule with incremental',
+            'incremental': True
+        }
+
+        res = self.client.post(url, post)
+        self.assertNoFormErrors(res)
+        self.assertMessageCount(success=1)
+
+        incremental_schedule_list = [post]
+
+        table = tables.SchedulesTable(res, incremental_schedule_list)
+        self.assertEqual(table.data[0]['incremental'], True)

@@ -25,16 +25,16 @@ from horizon.templatetags import sizeformat
 from horizon.utils import filters
 
 from trove_dashboard import api
-from trove_dashboard.content.database_backups \
-    import tables as backup_tables
-from trove_dashboard.content.databases.schedules \
-    import tables as schedules_tables
-from trove_dashboard.content.databases.upgrade \
-    import tables as upgrade_tables
+from trove_dashboard.content.database_backups import tables as backup_tables
+from trove_dashboard.content.databases.couchbase import (
+    tables as couchbase_tables)
+from trove_dashboard.content.databases.schedules import (
+    tables as schedules_tables)
+from trove_dashboard.content.databases.upgrade import tables as upgrade_tables
 from trove_dashboard.content import utils as database_utils
 
 
-class DeleteInstance(tables.BatchAction):
+class DeleteInstance(tables.DeleteAction):
     help_text = _("Deleted instances are not recoverable.")
 
     @staticmethod
@@ -57,7 +57,7 @@ class DeleteInstance(tables.BatchAction):
     classes = ("btn-danger", )
     icon = "remove"
 
-    def action(self, request, obj_id):
+    def delete(self, request, obj_id):
         api.trove.instance_delete(request, obj_id)
 
 
@@ -91,6 +91,46 @@ class RestartInstance(tables.BatchAction):
 
     def action(self, request, obj_id):
         api.trove.instance_restart(request, obj_id)
+
+
+class ForceDeleteAction(tables.DeleteAction):
+    name = "force_delete_action"
+    verbose_name = _("Force Delete")
+    help_text = _("Force deleted instances are not recoverable.")
+
+    @staticmethod
+    def action_present(count):
+        return ungettext_lazy(
+            u"Force Delete Instance",
+            u"Force Delete Instances",
+            count
+        )
+
+    @staticmethod
+    def action_past(count):
+        return ungettext_lazy(
+            u"Scheduled forced deletion of instance",
+            u"Scheduled forced deletion of instances",
+            count
+        )
+
+    def delete(self, request, obj_id):
+        api.trove.instance_force_delete(request, obj_id)
+
+
+class ResetStatusAction(tables.Action):
+    name = "reset_status_action"
+    verbose_name = _("Reset Status")
+    classes = ('btn-danger',)
+
+    def single(self, table, request, object_id):
+        try:
+            api.trove.instance_reset_status(request, object_id)
+            messages.success(request,
+                             _("Successfully reset status of instance."))
+        except Exception as e:
+            messages.warning(request,
+                             _("Cannot reset status: %s") % e.message)
 
 
 class DetachReplica(tables.BatchAction):
@@ -416,7 +456,7 @@ class CreateBackup(tables.LinkAction):
 
     def get_link_url(self, datam):
         url = urlresolvers.reverse(self.url)
-        return url + "?instance=%s" % datam.id
+        return url + "?instance=%s" % datam.id + "&include_clustered=False"
 
 
 class ResizeVolume(tables.LinkAction):
@@ -606,6 +646,16 @@ def get_databases(user):
     return _("-")
 
 
+def get_roles(user):
+    raw_roles = [role for role in getattr(user, "roles", [])]
+    if not raw_roles:
+        return _("-")
+    else:
+        roles = [role['name'] for role in raw_roles]
+        roles.sort()
+        return ', '.join(roles)
+
+
 class InstancesTable(tables.DataTable):
     name = tables.Column("name",
                          link="horizon:project:databases:detail",
@@ -646,14 +696,18 @@ class InstancesTable(tables.DataTable):
                        ManageRoot,
                        upgrade_tables.UpgradeInstanceAction,
                        schedules_tables.ViewSchedules,
+                       couchbase_tables.ManageBuckets,
                        RestartInstance,
-                       DeleteInstance)
+                       DeleteInstance,
+                       ResetStatusAction,
+                       ForceDeleteAction)
 
 
 class UsersTable(tables.DataTable):
     name = tables.Column("name", verbose_name=_("User Name"))
     host = tables.Column("host", verbose_name=_("Allowed Host"))
     databases = tables.Column(get_databases, verbose_name=_("Databases"))
+    roles = tables.Column(get_roles, verbose_name=_("Roles"))
 
     class Meta(object):
         name = "users"

@@ -12,6 +12,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+from django.conf import settings
 from django.core.urlresolvers import reverse
 from django.forms import ValidationError  # noqa
 from django.utils.translation import ugettext_lazy as _
@@ -22,6 +23,7 @@ from horizon import messages
 from horizon.utils import validators
 
 from trove_dashboard import api
+from trove_dashboard.content.databases import db_capability
 
 
 class CreateDatabaseForm(forms.SelfHandlingForm):
@@ -33,6 +35,14 @@ class CreateDatabaseForm(forms.SelfHandlingForm):
     collation = forms.CharField(
         label=_("Collation"), required=False,
         help_text=_("Optional collation type for the database."))
+
+    def __init__(self, request, *args, **kwargs):
+        super(CreateDatabaseForm, self).__init__(request, *args, **kwargs)
+
+        datastore = kwargs.get('initial', {}).get('datastore').get('type')
+        if not db_capability.is_mysql_compatible(datastore):
+            self.fields['character_set'].widget = forms.HiddenInput()
+            self.fields['collation'].widget = forms.HiddenInput()
 
     def handle(self, request, data):
         instance = data.get('instance_id')
@@ -150,6 +160,9 @@ class PromoteToReplicaSourceForm(forms.SelfHandlingForm):
         return True
 
 
+TROVE_ENABLE_USER_ROLES = getattr(settings, 'TROVE_ENABLE_USER_ROLES', [])
+
+
 class CreateUserForm(forms.SelfHandlingForm):
     instance_id = forms.CharField(widget=forms.HiddenInput())
     name = forms.CharField(label=_("Name"))
@@ -164,6 +177,26 @@ class CreateUserForm(forms.SelfHandlingForm):
         label=_('Initial Databases'), required=False,
         help_text=_('Optional comma separated list of databases user has '
                     'access to.'))
+    roles = forms.CharField(
+        label=_('Roles'), required=False,
+        help_text=_('Optional comma separated list of roles the user has.'))
+
+    def __init__(self, request, *args, **kwargs):
+        super(CreateUserForm, self).__init__(request, *args, **kwargs)
+
+        self.datastore = kwargs.get('initial', {}).get('datastore').get('type')
+        if self.datastore not in TROVE_ENABLE_USER_ROLES:
+            self.fields['roles'].widget = forms.HiddenInput()
+
+    def clean(self):
+        cleaned_data = super(CreateUserForm, self).clean()
+
+        if db_capability.is_couchbase_datastore(self.datastore):
+            if cleaned_data['roles'] and cleaned_data['roles'] != "read-only":
+                msg = _('The only valid role is "read-only".')
+                self._errors["roles"] = self.error_class([msg])
+
+        return cleaned_data
 
     def handle(self, request, data):
         instance = data.get('instance_id')
@@ -174,7 +207,8 @@ class CreateUserForm(forms.SelfHandlingForm):
                 data['name'],
                 data['password'],
                 host=data['host'],
-                databases=self._get_databases(data))
+                databases=self._get_databases(data),
+                roles=self._get_roles(data))
 
             messages.success(request,
                              _('Created user "%s".') % data['name'])
@@ -192,6 +226,13 @@ class CreateUserForm(forms.SelfHandlingForm):
             dbs = data['databases']
             databases = [{'name': d.strip()} for d in dbs.split(',')]
         return databases
+
+    def _get_roles(self, data):
+        roles = None
+        db_value = data['roles']
+        if db_value and db_value != u'':
+            roles = [{'name': r.strip()} for r in data['roles'].split(',')]
+        return roles
 
 
 class EditUserForm(forms.SelfHandlingForm):

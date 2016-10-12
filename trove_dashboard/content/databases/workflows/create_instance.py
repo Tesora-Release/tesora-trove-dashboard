@@ -12,7 +12,6 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import binascii
 import logging
 
 from django.conf import settings
@@ -29,6 +28,7 @@ from openstack_dashboard.dashboards.project.instances \
 from openstack_dashboard.dashboards.project.instances.workflows \
     import create_instance as dash_create_instance
 
+import re
 
 from trove_dashboard import api
 from trove_dashboard.content.databases import db_capability
@@ -37,11 +37,7 @@ from trove_dashboard.content import utils
 LOG = logging.getLogger(__name__)
 
 
-def parse_datastore_and_version_text(datastore_and_version):
-    if datastore_and_version:
-        datastore, datastore_version = datastore_and_version.split('-', 1)
-        return datastore.strip(), datastore_version.strip()
-    return None, None
+config_fields = {}
 
 
 class SetInstanceDetailsAction(workflows.Action):
@@ -83,9 +79,9 @@ class SetInstanceDetailsAction(workflows.Action):
             msg = _("You must select a datastore type and version.")
             self._errors["datastore"] = self.error_class([msg])
         else:
-            datastore, datastore_version = parse_datastore_and_version_text(
-                binascii.unhexlify(datastore_and_version))
-            field_name = self._build_flavor_field_name(datastore,
+            datastore, datastore_version = (
+                utils.parse_datastore_and_version_text(datastore_and_version))
+            field_name = utils.build_flavor_field_name(datastore,
                                                        datastore_version)
             flavor = self.data.get(field_name, None)
             if not flavor:
@@ -97,15 +93,15 @@ class SetInstanceDetailsAction(workflows.Action):
     def handle(self, request, context):
         datastore_and_version = context["datastore"]
         if datastore_and_version:
-            datastore, datastore_version = parse_datastore_and_version_text(
-                binascii.unhexlify(context["datastore"]))
-            field_name = self._build_flavor_field_name(datastore,
+            datastore, datastore_version = (
+                utils.parse_datastore_and_version_text(context["datastore"]))
+            field_name = utils.build_flavor_field_name(datastore,
                                                        datastore_version)
             flavor = self.data[field_name]
             if flavor:
                 context["flavor"] = flavor
 
-            volume_type_field_name = self._build_volume_type_field_name(
+            volume_type_field_name = utils.build_volume_type_field_name(
                 datastore, datastore_version)
             volume_type = self.data.get(volume_type_field_name, None)
             if volume_type:
@@ -191,7 +187,29 @@ class SetInstanceDetailsAction(workflows.Action):
             LOG.exception("Exception while obtaining backup information")
             return None
 
+    @memoized.memoized_method
+    def populate_config_choices(self, request, datastore, datastore_version):
+        try:
+            configs = api.trove.configuration_list(request)
+            config_name = "%(name)s (%(datastore)s - %(version)s)"
+            choices = [(c.id,
+                        config_name % {'name': c.name,
+                                       'datastore': c.datastore_name,
+                                       'version': c.datastore_version_name})
+                       for c in configs
+                       if (c.datastore_name == datastore and
+                           c.datastore_version_name == datastore_version)]
+        except Exception:
+            choices = []
+
+        if choices:
+            choices.insert(0, ("", _("Select configuration")))
+        else:
+            choices.insert(0, ("", _("No configurations available")))
+        return choices
+
     def populate_datastore_choices(self, request, context):
+        config_fields.clear()
         choices = ()
         datastores = self.datastores(request)
         if datastores is not None:
@@ -211,9 +229,9 @@ class SetInstanceDetailsAction(workflows.Action):
                         if self.backup_id:
                             if v.id != backup.datastore['version_id']:
                                 continue
-                        selection_text = self._build_datastore_display_text(
+                        selection_text = utils.build_datastore_display_text(
                             ds.name, v.name)
-                        widget_text = self._build_widget_field_name(
+                        widget_text = utils.build_widget_field_name(
                             ds.name, v.name)
                         version_choices = (version_choices +
                                            ((widget_text, selection_text),))
@@ -223,6 +241,9 @@ class SetInstanceDetailsAction(workflows.Action):
                         self._add_datastore_volume_type_field(request,
                                                               ds.name,
                                                               v.name)
+                        self._add_datastore_config_field_to_dict(request,
+                                                                 ds.name,
+                                                                 v.name)
                     choices = choices + version_choices
         return choices
 
@@ -230,9 +251,9 @@ class SetInstanceDetailsAction(workflows.Action):
                                     request,
                                     datastore,
                                     datastore_version):
-        name = self._build_widget_field_name(datastore, datastore_version)
+        name = utils.build_widget_field_name(datastore, datastore_version)
         attr_key = 'data-datastore-' + name
-        field_name = self._build_flavor_field_name(datastore,
+        field_name = utils.build_flavor_field_name(datastore,
                                                    datastore_version)
         self.fields[field_name] = forms.ChoiceField(
             label=_("Flavor"),
@@ -254,9 +275,9 @@ class SetInstanceDetailsAction(workflows.Action):
                                          request,
                                          datastore,
                                          datastore_version):
-        name = self._build_widget_field_name(datastore, datastore_version)
+        name = utils.build_widget_field_name(datastore, datastore_version)
         attr_key = 'data-datastore-' + name
-        field_name = self._build_volume_type_field_name(datastore,
+        field_name = utils.build_volume_type_field_name(datastore,
                                                         datastore_version)
         self.fields[field_name] = forms.ChoiceField(
             label=_("Volume Type"),
@@ -274,27 +295,30 @@ class SetInstanceDetailsAction(workflows.Action):
             self.fields[field_name].choices = (
                 utils.sort_volume_type_list(request, valid_types))
 
-    def _build_datastore_display_text(self, datastore, datastore_version):
-        return datastore + ' - ' + datastore_version
+    def _add_datastore_config_field_to_dict(self,
+                                            request,
+                                            datastore,
+                                            datastore_version):
+        name = utils.build_widget_field_name(datastore, datastore_version)
+        attr_key = 'data-datastore-' + name
+        field_name = utils.build_config_field_name(datastore,
+                                                   datastore_version)
+        config_fields[field_name] = forms.ChoiceField(
+            label=_("Configuration Group"),
+            required=False,
+            help_text=_('Select a configuration group'),
+            widget=forms.Select(attrs={
+                'class': 'switched',
+                'data-switch-on': 'datastore',
+                attr_key: _("Configuration Group")
+            }))
+        config_fields[field_name].choices = self.populate_config_choices(
+            request, datastore, datastore_version)
 
-    def _build_widget_field_name(self, datastore, datastore_version):
-        # Since the fieldnames cannot contain an uppercase character
-        # we generate a hex encoded string representation of the
-        # datastore and version as the fieldname
-        return binascii.hexlify(
-            self._build_datastore_display_text(datastore, datastore_version))
 
-    def _build_flavor_field_name(self, datastore, datastore_version):
-        return 'flavor-' + \
-               self._build_widget_field_name(datastore,
-                                             datastore_version)
-
-    def _build_volume_type_field_name(self, datastore, datastore_version):
-        return 'volume-type-' + \
-               self._build_widget_field_name(datastore,
-                                             datastore_version)
-
-
+TROVE_ENABLE_ORACLE_DATABASE_NAME_VALIDATION = getattr(settings,
+                                                       'FORCE_ORACLE_DATABASE',
+                                                       False)
 TROVE_ADD_USER_PERMS = getattr(settings, 'TROVE_ADD_USER_PERMS', [])
 TROVE_ADD_DATABASE_PERMS = getattr(settings, 'TROVE_ADD_DATABASE_PERMS', [])
 TROVE_ADD_PERMS = TROVE_ADD_USER_PERMS + TROVE_ADD_DATABASE_PERMS
@@ -335,12 +359,28 @@ class AddDatabasesAction(workflows.Action):
 
     def clean(self):
         cleaned_data = super(AddDatabasesAction, self).clean()
+        datastore, datastore_version = (
+            utils.parse_datastore_and_version_text(
+                self.data[u'datastore']))
+
+        if (TROVE_ENABLE_ORACLE_DATABASE_NAME_VALIDATION and
+                db_capability.is_oracle_compatible_datastore(datastore)):
+            databases = cleaned_data.get('databases')
+            if not databases:
+                msg = _('You must specify a database name.')
+                self._errors["databases"] = self.error_class([msg])
+            elif len(databases) > 8:
+                msg = _("Database name cannot exceed 8 characters.")
+                self._errors["databases"] = self.error_class([msg])
+            elif not re.match(r'[a-zA-Z0-9]\w+$', databases):
+                msg = _("Database name contains invalid characters.")
+                self._errors["databases"] = self.error_class([msg])
+
         if cleaned_data.get('user'):
             if not cleaned_data.get('password'):
                 msg = _('You must specify a password if you create a user.')
                 self._errors["password"] = self.error_class([msg])
-            datastore, datastore_version = parse_datastore_and_version_text(
-                binascii.unhexlify(self.data[u'datastore']))
+
             if db_capability.db_required_when_creating_user(datastore):
                 if not cleaned_data.get('databases'):
                     msg = _('You must specify at least one database if '
@@ -355,10 +395,6 @@ class InitializeDatabase(workflows.Step):
 
 
 class AdvancedAction(workflows.Action):
-    config = forms.ChoiceField(
-        label=_("Configuration Group"),
-        required=False,
-        help_text=_('Select a configuration group'))
     initial_state = forms.ChoiceField(
         label=_('Source for Initial State'),
         required=False,
@@ -423,6 +459,10 @@ class AdvancedAction(workflows.Action):
 
         super(AdvancedAction, self).__init__(request, *args, **kwargs)
 
+        if config_fields:
+            for k, v in config_fields.iteritems():
+                self.fields[k] = v
+
         if not getattr(settings, 'DATABASE_ENABLE_REGION_SUPPORT', False):
             self.fields['region'].widget = forms.HiddenInput()
 
@@ -433,24 +473,6 @@ class AdvancedAction(workflows.Action):
     class Meta(object):
         name = _("Advanced")
         help_text_template = "project/databases/_launch_advanced_help.html"
-
-    def populate_config_choices(self, request, context):
-        try:
-            configs = api.trove.configuration_list(request)
-            config_name = "%(name)s (%(datastore)s - %(version)s)"
-            choices = [(c.id,
-                        config_name % {'name': c.name,
-                                       'datastore': c.datastore_name,
-                                       'version': c.datastore_version_name})
-                       for c in configs]
-        except Exception:
-            choices = []
-
-        if choices:
-            choices.insert(0, ("", _("Select configuration")))
-        else:
-            choices.insert(0, ("", _("No configurations available")))
-        return choices
 
     def populate_backup_choices(self, request, context):
         try:
@@ -521,10 +543,12 @@ class AdvancedAction(workflows.Action):
     def clean(self):
         cleaned_data = super(AdvancedAction, self).clean()
 
-        datastore, datastore_version = parse_datastore_and_version_text(
-            binascii.unhexlify(self.data[u'datastore']))
+        datastore, datastore_version = (
+            utils.parse_datastore_and_version_text(self.data[u'datastore']))
 
-        config = self.cleaned_data['config']
+        field_name = utils.build_config_field_name(datastore,
+                                                   datastore_version)
+        config = self.data.get(field_name, None)
         if config:
             try:
                 # Make sure the user is not "hacking" the form
@@ -588,6 +612,19 @@ class AdvancedAction(workflows.Action):
             cleaned_data["locality"] = None
 
         return cleaned_data
+
+    def handle(self, request, context):
+        datastore_and_version = context["datastore"]
+        if datastore_and_version:
+            datastore, datastore_version = (
+                utils.parse_datastore_and_version_text(context["datastore"]))
+            field_name = utils.build_config_field_name(datastore,
+                                                       datastore_version)
+            config = self.data.get(field_name, None)
+            if config:
+                context["config"] = config
+
+        return context
 
 
 class Advanced(workflows.Step):
@@ -686,8 +723,9 @@ class LaunchInstance(workflows.Workflow):
         try:
             avail_zone = context.get('availability_zone', None)
 
-            datastore, datastore_version = parse_datastore_and_version_text(
-                binascii.unhexlify(self.context['datastore']))
+            datastore, datastore_version = (
+                utils.parse_datastore_and_version_text(
+                    self.context['datastore']))
             LOG.info("Launching database instance with parameters "
                      "{name=%s, volume=%s, volume_type=%s, flavor=%s, "
                      "datastore=%s, datastore_version=%s, "

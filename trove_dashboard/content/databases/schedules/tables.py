@@ -13,11 +13,14 @@
 #    under the License.
 
 from django.core import urlresolvers
+from django.template import defaultfilters as django_filters
 from django.utils.translation import ugettext_lazy as _
 from django.utils.translation import ungettext_lazy
 
 from horizon import tables
 from horizon.utils import filters
+
+import json
 
 from trove_dashboard import api
 from trove_dashboard.content import utils as database_utils
@@ -143,6 +146,14 @@ def get_schedule_detail_link(schedule):
         args=(schedule.instance, schedule.id,))
 
 
+def is_incremental(obj):
+    if hasattr(obj, 'input'):
+        input = json.loads(obj.input)
+        if 'incremental' in input and input['incremental']:
+            return True
+    return False
+
+
 class SchedulesTable(tables.DataTable):
     id = tables.Column(
         "id",
@@ -154,6 +165,10 @@ class SchedulesTable(tables.DataTable):
     pattern = tables.Column(
         "pattern",
         verbose_name=_("Pattern"))
+    incremental = tables.Column(
+        is_incremental,
+        verbose_name=_("Incremental"),
+        filters=(django_filters.yesno, django_filters.capfirst))
     next_execution_time = tables.Column(
         "next_execution_time",
         filters=[filters.parse_isotime],

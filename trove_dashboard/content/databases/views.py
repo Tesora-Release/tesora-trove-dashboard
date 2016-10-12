@@ -136,7 +136,19 @@ class CreateUserView(horizon_forms.ModalFormView):
 
     def get_initial(self):
         instance_id = self.kwargs['instance_id']
-        return {'instance_id': instance_id}
+        instance = self.get_instance()
+        return {'instance_id': instance_id,
+                'datastore': instance.datastore}
+
+    @memoized.memoized_method
+    def get_instance(self):
+        instance_id = self.kwargs['instance_id']
+        try:
+            return api.trove.instance_get(self.request, instance_id)
+        except Exception:
+            msg = _('Unable to retrieve instance details.')
+            redirect = reverse('horizon:project:databases:index')
+            exceptions.handle(self.request, msg, redirect=redirect)
 
 
 class EditUserView(horizon_forms.ModalFormView):
@@ -320,7 +332,19 @@ class CreateDatabaseView(horizon_forms.ModalFormView):
 
     def get_initial(self):
         instance_id = self.kwargs['instance_id']
-        return {'instance_id': instance_id}
+        instance = self.get_instance()
+        return {'instance_id': instance_id,
+                'datastore': instance.datastore}
+
+    @memoized.memoized_method
+    def get_instance(self):
+        instance_id = self.kwargs['instance_id']
+        try:
+            return api.trove.instance_get(self.request, instance_id)
+        except Exception:
+            msg = _('Unable to retrieve instance details.')
+            redirect = reverse('horizon:project:databases:index')
+            exceptions.handle(self.request, msg, redirect=redirect)
 
 
 class ResizeVolumeView(horizon_forms.ModalFormView):
