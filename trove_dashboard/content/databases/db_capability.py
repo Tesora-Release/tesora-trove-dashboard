@@ -32,7 +32,7 @@ _oracle_compatible_datastores = (ORACLE, ORACLE_RA, ORACLE_RAC)
 _cluster_capable_datastores = (CASSANDRA, COUCHBASE, DSE, MARIA, MONGODB,
                                ORACLE_RAC, PERCONA_CLUSTER, REDIS, VERTICA)
 _cluster_grow_shrink_capable_datastores = (CASSANDRA, COUCHBASE, DSE, MARIA,
-                                           MONGODB, REDIS)
+                                           MONGODB, PERCONA_CLUSTER, REDIS)
 
 
 def can_backup(datastore):

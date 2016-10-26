@@ -1485,7 +1485,8 @@ class DatabaseTests(test.TestCase):
 
         res = self.client.get(INDEX_URL)
         self.assertContains(res, 'Force Delete Instance')
-        self.assertContains(res, 'Reset Status')
+        # Disabling it until policy support is added
+        # self.assertContains(res, 'Reset Status')
 
     @test.create_stubs({
         api.trove: ('datastore_version_list', 'flavor_list', 'instance_list')
@@ -1507,4 +1508,5 @@ class DatabaseTests(test.TestCase):
 
         res = self.client.get(INDEX_URL)
         self.assertContains(res, 'Force Delete Instance')
-        self.assertContains(res, 'Reset Status')
+        # Disabling it until policy support is added
+        # self.assertContains(res, 'Reset Status')

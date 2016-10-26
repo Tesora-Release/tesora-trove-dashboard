@@ -132,6 +132,9 @@ class ResetStatusAction(tables.Action):
             messages.warning(request,
                              _("Cannot reset status: %s") % e.message)
 
+    def allowed(self, request, datum):
+        return False
+
 
 class DetachReplica(tables.BatchAction):
     @staticmethod

@@ -20,6 +20,8 @@ from django.utils.translation import ungettext_lazy
 from horizon import tables
 from horizon.utils import filters
 
+from openstack_dashboard.api.base import is_service_enabled
+
 import json
 
 from trove_dashboard import api
@@ -32,7 +34,8 @@ class ViewSchedules(tables.LinkAction):
     url = "horizon:project:databases:schedules:view_schedules"
 
     def allowed(self, request, instance):
-        return instance.status in database_utils.ACTIVE_STATES
+        return is_service_enabled(request, 'workflowv2') and \
+            instance.status in database_utils.ACTIVE_STATES
 
     def get_link_url(self, datum):
         instance_id = self.table.get_object_id(datum)

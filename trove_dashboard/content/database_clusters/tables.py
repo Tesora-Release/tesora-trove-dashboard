@@ -106,6 +106,9 @@ class ResetStatus(tables.Action):
             messages.warning(request,
                              _("Cannot reset status: %s") % e.message)
 
+    def allowed(self, request, datum):
+        return False
+
 
 class LaunchLink(tables.LinkAction):
     name = "launch"
