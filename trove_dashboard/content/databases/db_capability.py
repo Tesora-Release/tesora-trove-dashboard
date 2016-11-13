@@ -33,6 +33,8 @@ _cluster_capable_datastores = (CASSANDRA, COUCHBASE, DSE, MARIA, MONGODB,
                                ORACLE_RAC, PERCONA_CLUSTER, REDIS, VERTICA)
 _cluster_grow_shrink_capable_datastores = (CASSANDRA, COUCHBASE, DSE, MARIA,
                                            MONGODB, PERCONA_CLUSTER, REDIS)
+_cluster_configuration_capable_datastores = (CASSANDRA, DSE, MARIA,
+                                             PERCONA_CLUSTER)
 
 
 def can_backup(datastore):
@@ -52,10 +54,21 @@ def can_modify_cluster(datastore):
                                  _cluster_grow_shrink_capable_datastores)
 
 
-def db_required_when_creating_user(datastore):
-    if is_oracle_ra_datastore(datastore) or is_couchbase_datastore(datastore):
+def has_users(datastore):
+    if is_couchbase_datastore(datastore):
         return False
     return True
+
+
+def has_databases(datastore):
+    if is_couchbase_datastore(datastore):
+        return False
+    return True
+
+
+def supports_configuration(datastore):
+    return _is_datastore_in_list(datastore,
+                                 _cluster_configuration_capable_datastores)
 
 
 def is_cluster_capable_datastore(datastore):

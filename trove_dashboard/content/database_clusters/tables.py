@@ -32,10 +32,16 @@ from horizon.utils import memoized
 
 from trove_dashboard import api
 from trove_dashboard.content.database_clusters import cluster_manager
+from trove_dashboard.content.database_clusters.configurations import (
+    tables as configurations_tables)
 from trove_dashboard.content.database_clusters.couchbase import (
     tables as couchbase_tables)
+from trove_dashboard.content.database_clusters.database import (
+    tables as database_tables)
 from trove_dashboard.content.database_clusters.upgrade import (
     tables as upgrade_tables)
+from trove_dashboard.content.database_clusters.user import (
+    tables as user_tables)
 from trove_dashboard.content.databases import db_capability
 from trove_dashboard.content import utils as database_utils
 
@@ -90,6 +96,35 @@ class ForceDelete(tables.DeleteAction):
 
     def delete(self, request, obj_id):
         api.trove.cluster_force_delete(request, obj_id)
+
+
+class RestartCluster(tables.BatchAction):
+    @staticmethod
+    def action_present(count):
+        return ungettext_lazy(
+            u"Restart Cluster",
+            u"Restart Clusters",
+            count
+        )
+
+    @staticmethod
+    def action_past(count):
+        return ungettext_lazy(
+            u"Restarted Cluster",
+            u"Restarted Clusters",
+            count
+        )
+
+    name = "restart"
+    classes = ('btn-danger', 'btn-reboot')
+
+    def allowed(self, request, cluster=None):
+        if cluster and cluster.task["name"] == 'NONE':
+            return True
+        return False
+
+    def action(self, request, obj_id):
+        api.trove.cluster_restart(request, obj_id)
 
 
 class ResetStatus(tables.Action):
@@ -228,8 +263,12 @@ class ClustersTable(tables.DataTable):
         row_class = UpdateRow
         table_actions = (LaunchLink, DeleteCluster)
         row_actions = (ClusterGrow, ClusterShrink,
+                       database_tables.ManageDatabases,
+                       user_tables.ManageUsers,
+                       configurations_tables.AttachConfiguration,
+                       configurations_tables.DetachConfiguration,
                        upgrade_tables.UpgradeCluster, ResetPassword,
-                       DeleteCluster, ResetStatus, ForceDelete)
+                       RestartCluster, DeleteCluster, ResetStatus, ForceDelete)
 
 
 def get_instance_size(instance):

@@ -16,6 +16,14 @@
         <dd>{{ cluster.full_flavor.ram|mbformat }}</dd>
         <dt>{% trans "Number of Instances" %}</dt>
         <dd>{{ cluster.num_instances }}</dd>
+        {% if cluster.configuration %}
+        <dt>{% trans "Configuration Group" %}</dt>
+        <dd>
+            <a href="{% url 'horizon:project:database_configurations:detail' cluster.configuration %}">
+                {{ cluster.configuration }}
+            </a>
+        </dd>
+        {% endif %}
         {% if cluster.locality %}
             <dt>{% trans "Locality" %}</dt>
             <dd>{{ cluster.locality }}</dd>

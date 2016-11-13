@@ -16,6 +16,7 @@ from django.utils.translation import ugettext_lazy as _
 
 from horizon import exceptions
 from horizon import tabs
+from horizon.utils import memoized
 
 from trove_dashboard import api
 from trove_dashboard.content.database_configurations \
@@ -60,11 +61,19 @@ class InstancesTab(tabs.TableTab):
         try:
             data = api.trove.configuration_instances(self.request,
                                                      configuration.id)
+            for config_instance in data:
+                instance = self.get_instance(config_instance.id)
+                if hasattr(instance, 'cluster_id'):
+                    config_instance.cluster_id = instance.cluster_id
         except Exception:
             msg = _('Unable to get configuration data.')
             exceptions.handle(self.request, msg)
             data = []
         return data
+
+    @memoized.memoized_method
+    def get_instance(self, instance_id):
+        return api.trove.instance_get(self.request, instance_id)
 
 
 class ConfigurationDetailTabs(tabs.TabGroup):

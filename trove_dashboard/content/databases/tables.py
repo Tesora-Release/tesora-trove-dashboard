@@ -251,7 +251,8 @@ class GrantAccess(tables.BatchAction):
             self.table.kwargs['instance_id'],
             self.table.kwargs['user_name'],
             [obj_id],
-            host=self.table.kwargs['user_host'])
+            host=database_utils.parse_user_host(self.table.kwargs[
+                                                'user_host']))
 
 
 class RevokeAccess(tables.BatchAction):
@@ -285,7 +286,8 @@ class RevokeAccess(tables.BatchAction):
             self.table.kwargs['instance_id'],
             self.table.kwargs['user_name'],
             obj_id,
-            host=self.table.kwargs['user_host'])
+            host=database_utils.parse_user_host(self.table.kwargs[
+                                                'user_host']))
 
 
 class AccessTable(tables.DataTable):
@@ -319,7 +321,8 @@ class ManageAccess(tables.LinkAction):
         user = datum
         return urlresolvers.reverse(self.url, args=[user.instance.id,
                                                     user.name,
-                                                    user.host])
+                                                    getattr(user, 'host', '-')
+                                                    ])
 
 
 class CreateUser(tables.LinkAction):
@@ -330,13 +333,16 @@ class CreateUser(tables.LinkAction):
     icon = "plus"
 
     def allowed(self, request, instance=None):
-        instance = self.table.kwargs['instance']
+        instance = self.get_table_id()
         return (instance.status in database_utils.ACTIVE_STATES and
                 has_user_add_perm(request))
 
     def get_link_url(self, datum=None):
-        instance_id = self.table.kwargs['instance_id']
-        return urlresolvers.reverse(self.url, args=[instance_id])
+        instance = self.get_table_id()
+        return urlresolvers.reverse(self.url, args=[instance.id])
+
+    def get_table_id(self):
+        return self.table.kwargs['instance']
 
 
 class EditUser(tables.LinkAction):
@@ -347,7 +353,7 @@ class EditUser(tables.LinkAction):
     icon = "pencil"
 
     def allowed(self, request, instance=None):
-        instance = self.table.kwargs['instance']
+        instance = self.get_table_id()
         return (instance.status in database_utils.ACTIVE_STATES and
                 has_user_add_perm(request))
 
@@ -355,7 +361,11 @@ class EditUser(tables.LinkAction):
         user = datum
         return urlresolvers.reverse(self.url, args=[user.instance.id,
                                                     user.name,
-                                                    user.host])
+                                                    getattr(user, 'host', '-')
+                                                    ])
+
+    def get_table_id(self):
+        return self.table.kwargs['instance']
 
 
 def has_user_add_perm(request):
@@ -385,7 +395,7 @@ class DeleteUser(tables.DeleteAction):
     def delete(self, request, obj_id):
         user = self.table.get_object_by_id(obj_id)
         api.trove.user_delete(request, user.instance.id, user.name,
-                              host=user.host)
+                              host=getattr(user, 'host', None))
 
 
 class CreateDatabase(tables.LinkAction):
@@ -396,13 +406,16 @@ class CreateDatabase(tables.LinkAction):
     icon = "plus"
 
     def allowed(self, request, database=None):
-        instance = self.table.kwargs['instance']
+        instance = self.get_table_id()
         return (instance.status in database_utils.ACTIVE_STATES and
                 has_database_add_perm(request))
 
     def get_link_url(self, datum=None):
-        instance_id = self.table.kwargs['instance_id']
-        return urlresolvers.reverse(self.url, args=[instance_id])
+        instance = self.get_table_id()
+        return urlresolvers.reverse(self.url, args=[instance.id])
+
+    def get_table_id(self):
+        return self.table.kwargs['instance']
 
 
 def has_database_add_perm(request):

@@ -168,7 +168,12 @@ class UpdateCell(tables.UpdateAction):
             if error_msg:
                 raise core_exceptions.ValidationError(error_msg)
 
-        if isinstance(config_param.value, types.IntType):
+        if isinstance(config_param.value, types.BooleanType):
+            if new_cell_value.lower() == "true":
+                value = True
+            else:
+                value = False
+        elif isinstance(config_param.value, types.IntType):
             value = int(new_cell_value)
         elif isinstance(config_param.value, types.LongType):
             value = long(new_cell_value)
@@ -187,19 +192,6 @@ class UpdateCell(tables.UpdateAction):
     def parameters(self, request, datastore, datastore_version):
         return api.trove.configuration_parameters_list(
             request, datastore, datastore_version)
-
-    def _adjust_type(self, data_type, value):
-        if not value:
-            return value
-        if data_type == "float":
-            new_value = float(value)
-        elif data_type == "long":
-            new_value = long(value)
-        elif data_type == "integer":
-            new_value = int(value)
-        else:
-            new_value = value
-        return new_value
 
 
 class ValuesTable(tables.DataTable):
@@ -240,14 +232,38 @@ class DetachConfiguration(tables.BatchAction):
     name = "detach_configuration"
     classes = ('btn-danger', 'btn-detach-config')
 
+    def allowed(self, request, instance=None):
+        if hasattr(instance, 'cluster_id'):
+            return False
+        return True
+
     def action(self, request, obj_id):
         api.trove.instance_detach_configuration(request, obj_id)
+
+
+def get_cluster_info(config_instance):
+    if hasattr(config_instance, 'cluster_id'):
+        return config_instance.cluster_id
+    else:
+        return None
+
+
+def get_cluster_link(datum):
+    if hasattr(datum, 'cluster_id'):
+        return urlresolvers.reverse("horizon:project:database_clusters:detail",
+                                    args=(datum.cluster_id,))
+    else:
+        return None
 
 
 class InstancesTable(tables.DataTable):
     name = tables.Column("name",
                          link="horizon:project:databases:detail",
                          verbose_name=_("Name"))
+    cluster_id = tables.Column(
+        get_cluster_info,
+        link=get_cluster_link,
+        verbose_name=_('Cluster ID'))
 
     class Meta(object):
         name = "instances"

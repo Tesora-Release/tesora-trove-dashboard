@@ -380,12 +380,6 @@ class AddDatabasesAction(workflows.Action):
             if not cleaned_data.get('password'):
                 msg = _('You must specify a password if you create a user.')
                 self._errors["password"] = self.error_class([msg])
-
-            if db_capability.db_required_when_creating_user(datastore):
-                if not cleaned_data.get('databases'):
-                    msg = _('You must specify at least one database if '
-                            'you create a user.')
-                    self._errors["databases"] = self.error_class([msg])
         return cleaned_data
 
 

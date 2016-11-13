@@ -14,6 +14,7 @@
 
 import copy
 import logging
+import six
 
 from django.core.urlresolvers import reverse
 from django import http
@@ -469,7 +470,8 @@ class DatabaseConfigurationsTests(test.TestCase):
         self.assertEqual((number_params - 1), new_number_params)
 
     @test.create_stubs({
-        api.trove: ('configuration_instances', 'configuration_update',),
+        api.trove: ('configuration_instances', 'configuration_update',
+                    'instance_get'),
         config_param_manager: ('get',)
     })
     def test_instances_tab(self):
@@ -489,6 +491,9 @@ class DatabaseConfigurationsTests(test.TestCase):
             api.trove.configuration_instances(IsA(http.HttpRequest),
                                               config.id)\
                 .AndReturn(self.configuration_instances.list())
+            (api.trove.instance_get(IsA(http.HttpRequest),
+                                    IsA(six.string_types))
+                .AndReturn(self.databases.first()))
             self.mox.ReplayAll()
 
             details_url = self._get_url_with_arg(DETAIL_URL, config.id)

@@ -165,3 +165,10 @@ def parse_instance_text(encoded_instance):
         instance = binascii.unhexlify(encoded_instance)
         return instance.strip()
     return None
+
+
+def parse_user_host(user_host):
+    if user_host == '-':
+        return None
+    else:
+        return user_host

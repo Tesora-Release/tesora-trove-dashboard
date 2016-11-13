@@ -194,6 +194,13 @@ class ClusterAddInstancesView(horizon_forms.ModalFormView):
     def get_initial(self):
         initial = super(ClusterAddInstancesView, self).get_initial()
         initial['cluster_id'] = self.kwargs['cluster_id']
+        try:
+            cluster = api.trove.cluster_get(self.request,
+                                            initial['cluster_id'])
+            initial['datastore'] = cluster.datastore
+        except Exception:
+            msg = _('Unable to retrieve cluster details.')
+            exceptions.handle(self.request, msg)
         return initial
 
     def get_success_url(self):

@@ -188,6 +188,11 @@ def adjust_type(data_type, value):
         new_value = long(value)
     elif data_type == "integer":
         new_value = int(value)
+    elif data_type == "boolean":
+        if value.lower() == "true":
+            new_value = True
+        else:
+            new_value = False
     else:
         new_value = value
     return new_value

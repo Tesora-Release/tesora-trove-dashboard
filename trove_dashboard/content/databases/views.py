@@ -38,7 +38,9 @@ from trove_dashboard.content.databases import forms
 from trove_dashboard.content.databases import tables
 from trove_dashboard.content.databases import tabs
 from trove_dashboard.content.databases import workflows
+from trove_dashboard.content import utils
 from trove_dashboard.templatetags.tesora import tesora_version
+
 
 LOG = logging.getLogger(__name__)
 
@@ -124,31 +126,33 @@ class CreateUserView(horizon_forms.ModalFormView):
     success_url = 'horizon:project:databases:detail'
 
     def get_success_url(self):
-        return reverse(self.success_url,
-                       args=(self.kwargs['instance_id'],))
+        return reverse(self.success_url, args=(self.get_id(),))
 
     def get_context_data(self, **kwargs):
         context = super(CreateUserView, self).get_context_data(**kwargs)
-        context['instance_id'] = self.kwargs['instance_id']
-        args = (self.kwargs['instance_id'],)
+        context['instance_id'] = self.get_id()
+        args = (self.get_id(),)
         context['submit_url'] = reverse(self.submit_url, args=args)
         return context
 
     def get_initial(self):
-        instance_id = self.kwargs['instance_id']
+        instance_id = self.get_id()
         instance = self.get_instance()
         return {'instance_id': instance_id,
                 'datastore': instance.datastore}
 
     @memoized.memoized_method
     def get_instance(self):
-        instance_id = self.kwargs['instance_id']
+        instance_id = self.get_id()
         try:
             return api.trove.instance_get(self.request, instance_id)
         except Exception:
             msg = _('Unable to retrieve instance details.')
             redirect = reverse('horizon:project:databases:index')
             exceptions.handle(self.request, msg, redirect=redirect)
+
+    def get_id(self):
+        return self.kwargs['instance_id']
 
 
 class EditUserView(horizon_forms.ModalFormView):
@@ -192,7 +196,7 @@ class AccessDetailView(horizon_tables.DataTableView):
     def get_data(self):
         instance_id = self.kwargs['instance_id']
         user_name = self.kwargs['user_name']
-        user_host = self.kwargs['user_host']
+        user_host = utils.parse_user_host(self.kwargs['user_host'])
         try:
             databases = api.trove.database_list(self.request, instance_id)
         except Exception:

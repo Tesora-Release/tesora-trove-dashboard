@@ -363,6 +363,28 @@ class LaunchForm(forms.SelfHandlingForm):
                               _('Unable to obtain datastore versions.'),
                               redirect=redirect)
 
+    @memoized.memoized_method
+    def populate_config_choices(self, request, datastore, datastore_version):
+        try:
+            configs = trove_api.trove.configuration_list(request)
+            config_name = "%(name)s (%(datastore)s - %(version)s)"
+
+            choices = [(c.id,
+                        config_name % {'name': c.name,
+                                       'datastore': c.datastore_name,
+                                       'version': c.datastore_version_name})
+                       for c in configs
+                       if (c.datastore_name == datastore and
+                           c.datastore_version_name == datastore_version)]
+        except Exception:
+            choices = []
+
+        if choices:
+            choices.insert(0, ("", _("Select configuration")))
+        else:
+            choices.insert(0, ("", _("No configurations available")))
+        return choices
+
     def populate_datastore_choices(self, request):
         choices = ()
         datastores = self.filter_cluster_datastores(request)
@@ -382,6 +404,9 @@ class LaunchForm(forms.SelfHandlingForm):
                             ds.name, v.name)
                         version_choices = (version_choices +
                                            ((widget_text, selection_text),))
+                        if db_capability.supports_configuration(ds.name):
+                            self._add_datastore_config_field(request, ds.name,
+                                                             v.name)
                         k, v = self._add_datastore_flavor_field(request,
                                                                 ds.name,
                                                                 v.name)
@@ -416,6 +441,26 @@ class LaunchForm(forms.SelfHandlingForm):
                 request, valid_flavors)
 
         return name, field
+
+    def _add_datastore_config_field(self,
+                                    request,
+                                    datastore,
+                                    datastore_version):
+        name = utils.build_widget_field_name(datastore, datastore_version)
+        attr_key = 'data-datastore-' + name
+        field_name = utils.build_config_field_name(datastore,
+                                                   datastore_version)
+        self.fields[field_name] = forms.ChoiceField(
+            label=_("Configuration Group"),
+            required=False,
+            help_text=_("Select a configuration group"),
+            widget=forms.Select(attrs={
+                'class': 'switched',
+                'data-switch-on': 'datastore',
+                attr_key: _("Configuration Group")
+            }))
+        self.fields[field_name].choices = self.populate_config_choices(
+            request, datastore, datastore_version)
 
     def _insert_datastore_version_fields(self, datastore_flavor_fields):
         datastore_index = None
@@ -466,6 +511,14 @@ class LaunchForm(forms.SelfHandlingForm):
             instance_type = data['instance_type'].strip().split(",")
         return instance_type
 
+    def _get_configuration(self, data, datastore, datastore_version):
+        configuration = None
+        config_field_name = utils.build_config_field_name(
+            datastore, datastore_version)
+        if data.get(config_field_name):
+            configuration = data[config_field_name]
+        return configuration
+
     def _build_extended_properties(self, data, datastore):
         extended_properties = None
 
@@ -508,11 +561,14 @@ class LaunchForm(forms.SelfHandlingForm):
             LOG.info("Launching cluster with parameters "
                      "{name=%s, volume=%s, flavor=%s, "
                      "datastore=%s, datastore_version=%s,"
-                     "locality=%s, AZ=%s, region=%s, instance_type=%s",
+                     "locality=%s, AZ=%s, region=%s, instance_type=%s,"
+                     "configuration=%s",
                      data['name'], data['volume'], flavor,
                      datastore, datastore_version, self._get_locality(data),
                      avail_zone, self._get_region(data),
-                     self._get_instance_type(data))
+                     self._get_instance_type(data),
+                     self._get_configuration(data, datastore, datastore_version
+                                             ))
 
             trove_api.trove.cluster_create(request,
                                            data['name'],
@@ -529,7 +585,11 @@ class LaunchForm(forms.SelfHandlingForm):
                                            instance_type=(
                                                self._get_instance_type(data)),
                                            extended_properties=(
-                                               extended_properties
+                                               extended_properties),
+                                           configuration=(
+                                               self._get_configuration(
+                                                   data, datastore,
+                                                   datastore_version)
                                            ))
             messages.success(request,
                              _('Launched cluster "%s"') % data['name'])

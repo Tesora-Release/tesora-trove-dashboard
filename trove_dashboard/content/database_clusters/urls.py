@@ -18,10 +18,16 @@ from django.conf.urls import include  # noqa
 from django.conf.urls import patterns  # noqa
 from django.conf.urls import url  # noqa
 
+from trove_dashboard.content.database_clusters.configurations import (
+    urls as configurations_urls)
 from trove_dashboard.content.database_clusters.couchbase import (
     urls as couchbase_urls)
+from trove_dashboard.content.database_clusters.database import (
+    urls as database_urls)
 from trove_dashboard.content.database_clusters.upgrade import (
     urls as upgrade_urls)
+from trove_dashboard.content.database_clusters.user import (
+    urls as user_urls)
 from trove_dashboard.content.database_clusters import views
 
 BASECLUSTERS = r'^(?P<cluster_id>[^/]+)/%s'
@@ -51,6 +57,12 @@ urlpatterns = patterns(
         name='backup_instance'),
     url(BASEINSTANCES % 'couchbase/',
         include(couchbase_urls, namespace='couchbase')),
+    url(BASECLUSTERS % 'configurations/',
+        include(configurations_urls, namespace='configurations')),
+    url(BASECLUSTERS % 'database/',
+        include(database_urls, namespace='database')),
     url(BASECLUSTERS % 'upgrade/',
         include(upgrade_urls, namespace='upgrade')),
+    url(BASECLUSTERS % 'user/',
+        include(user_urls, namespace='user')),
 )

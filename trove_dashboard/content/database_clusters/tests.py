@@ -302,7 +302,8 @@ class ClustersTests(test.TestCase):
             availability_zone=IsA(six.text_type),
             region=None,
             instance_type=None,
-            extended_properties=None
+            extended_properties=None,
+            configuration=None
         ).AndReturn(self.trove_clusters.first())
 
         field_name = utils.build_widget_field_name(cluster_datastore,
@@ -371,7 +372,8 @@ class ClustersTests(test.TestCase):
             availability_zone=IsA(six.text_type),
             region=None,
             instance_type=None,
-            extended_properties=None
+            extended_properties=None,
+            configuration=None
         ).AndReturn(self.trove_clusters.first())
 
         field_name = utils.build_widget_field_name(cluster_datastore,

@@ -28,6 +28,7 @@ class CreateBucketForm(forms.SelfHandlingForm):
         label=_("Name"))
     password = forms.CharField(
         label=_("Password"),
+        widget=forms.PasswordInput(),
         min_length=6,
         max_length=24)
     bucket_ramsize = forms.IntegerField(
@@ -114,6 +115,7 @@ class UpdateBucketForm(forms.SelfHandlingForm):
         widget=forms.TextInput(attrs={'readonly': 'readonly'}))
     password = forms.CharField(
         label=_("Password"),
+        widget=forms.PasswordInput(),
         min_length=6,
         max_length=24)
     bucket_ramsize = forms.IntegerField(

@@ -24,6 +24,7 @@ from horizon.utils import validators
 
 from trove_dashboard import api
 from trove_dashboard.content.databases import db_capability
+from trove_dashboard.content import utils
 
 
 class CreateDatabaseForm(forms.SelfHandlingForm):
@@ -35,6 +36,7 @@ class CreateDatabaseForm(forms.SelfHandlingForm):
     collation = forms.CharField(
         label=_("Collation"), required=False,
         help_text=_("Optional collation type for the database."))
+    index_url = "horizon:project:databases:detail"
 
     def __init__(self, request, *args, **kwargs):
         super(CreateDatabaseForm, self).__init__(request, *args, **kwargs)
@@ -54,8 +56,7 @@ class CreateDatabaseForm(forms.SelfHandlingForm):
             messages.success(request,
                              _('Created database "%s".') % data['name'])
         except Exception as e:
-            redirect = reverse("horizon:project:databases:detail",
-                               args=(instance,))
+            redirect = reverse(self.index_url, args=(instance,))
             exceptions.handle(request, _('Unable to create database. %s') %
                               e.message, redirect=redirect)
         return True
@@ -180,6 +181,7 @@ class CreateUserForm(forms.SelfHandlingForm):
     roles = forms.CharField(
         label=_('Roles'), required=False,
         help_text=_('Optional comma separated list of roles the user has.'))
+    index_url = "horizon:project:databases:detail"
 
     def __init__(self, request, *args, **kwargs):
         super(CreateUserForm, self).__init__(request, *args, **kwargs)
@@ -213,8 +215,7 @@ class CreateUserForm(forms.SelfHandlingForm):
             messages.success(request,
                              _('Created user "%s".') % data['name'])
         except Exception as e:
-            redirect = reverse("horizon:project:databases:detail",
-                               args=(instance,))
+            redirect = reverse(self.index_url, args=(instance,))
             exceptions.handle(request, _('Unable to create user. %s') %
                               e.message, redirect=redirect)
         return True
@@ -250,6 +251,7 @@ class EditUserForm(forms.SelfHandlingForm):
         regex=validators.password_validator(),
         error_messages={'invalid': validators.password_validator_msg()})
     new_host = forms.CharField(label=_("New Host"), required=False)
+    index_url = "horizon:project:databases:detail"
 
     validation_error_message = _('A new name or new password or '
                                  'new host must be specified.')
@@ -261,7 +263,7 @@ class EditUserForm(forms.SelfHandlingForm):
                 request,
                 instance,
                 data['user_name'],
-                host=data['user_host'],
+                host=utils.parse_user_host(data['user_host']),
                 new_name=data['new_name'],
                 new_password=data['new_password'],
                 new_host=data['new_host'])
@@ -269,8 +271,7 @@ class EditUserForm(forms.SelfHandlingForm):
             messages.success(request,
                              _('Updated user "%s".') % data['user_name'])
         except Exception as e:
-            redirect = reverse("horizon:project:databases:detail",
-                               args=(instance,))
+            redirect = reverse(self.index_url, args=(instance,))
             exceptions.handle(request, _('Unable to update user. %s') %
                               e.message, redirect=redirect)
         return True

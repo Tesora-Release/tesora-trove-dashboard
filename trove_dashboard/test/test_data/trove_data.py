@@ -86,9 +86,14 @@ CLUSTER_DATA_ONE = {
         }
     ],
     "task": {
-        "name": "test_task"
+        "name": "NONE"
     },
-    "locality": "anti-affinity"
+    "locality": "anti-affinity",
+    "configuration": {
+        "id": "0ef978d3-7c83-4192-ab86-b7a0a5010fa0",
+        "links": [],
+        "name": "config1"
+    },
 }
 
 CLUSTER_DATA_TWO = {
@@ -410,6 +415,21 @@ CONFIG_TWO = {
     "datastore_version_name": "5.6"
 }
 
+CONFIG_THREE = {
+    "updated": "2014-08-11T14:33:35",
+    "name": "config3",
+    "created": "2014-08-11T14:33:35",
+    "instance_count": 0,
+    "values": {
+        "collation_server": "latin1_swedish_ci",
+        "max_connections": 5000
+    },
+    "id": "87948232-10e7-4636-f3d3-a5f1593b7d16",
+    "description": "Long description of configuration two",
+    "datastore_name": "mongodb",
+    "datastore_version_name": "2.6"
+}
+
 CONFIG_INSTANCE_ONE = {
     "id": "c3369597-b53a-4bd4-bf54-41957c1291b8",
     "name": "Test Database with Config",
@@ -657,6 +677,8 @@ def data(TEST):
                                         CONFIG_ONE)
     cfg2 = configurations.Configuration(configurations.Configurations(None),
                                         CONFIG_TWO)
+    cfg3 = configurations.Configuration(configurations.Configurations(None),
+                                        CONFIG_THREE)
 
     user1 = users.User(users.Users(None), USER_ONE)
     user_db1 = databases.Database(databases.Databases(None),
@@ -756,6 +778,7 @@ def data(TEST):
 
     TEST.database_configurations.add(cfg1)
     TEST.database_configurations.add(cfg2)
+    TEST.database_configurations.add(cfg3)
 
     TEST.configuration_parameters = utils.TestDataContainer()
     for parameter in CONFIG_PARAMS_ONE:
