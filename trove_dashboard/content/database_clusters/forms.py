@@ -51,10 +51,6 @@ class LaunchForm(forms.SelfHandlingForm):
             'class': 'switchable',
             'data-slug': 'datastore'
         }))
-    network = forms.ChoiceField(
-        label=_("Network"),
-        help_text=_("Network attached to instance."),
-        required=False)
     volume = forms.IntegerField(
         label=_("Volume Size"),
         min_value=0,
@@ -191,8 +187,6 @@ class LaunchForm(forms.SelfHandlingForm):
 
         self.fields['datastore'].choices = self.populate_datastore_choices(
             request)
-        self.fields['network'].choices = self.populate_network_choices(
-            request)
         self.fields['availability_zone'].choices = (
             self.populate_availability_zone_choices(request))
         self.fields['region'].choices = self.populate_region_choices(
@@ -275,17 +269,16 @@ class LaunchForm(forms.SelfHandlingForm):
                               redirect=redirect)
 
     @memoized.memoized_method
-    def populate_network_choices(self, request):
+    def populate_network_choices(self, request, datastore, datastore_version):
         network_list = []
         try:
-            if api.base.is_service_enabled(request, 'network'):
-                tenant_id = self.request.user.tenant_id
-                networks = api.neutron.network_list_for_tenant(request,
-                                                               tenant_id)
-                network_list = [(network.id, network.name_or_id)
-                                for network in networks]
-            else:
-                self.fields['network'].widget = forms.HiddenInput()
+            tenant_id = self.request.user.tenant_id
+            networks = api.neutron.network_list_for_tenant(request,
+                                                           tenant_id)
+            network_list = [(network.id, network.name_or_id)
+                            for network in networks]
+            if db_capability.is_oracle_rac_datastore(datastore):
+                network_list.insert(0, (None, None))
         except exceptions.ServiceCatalogException:
             network_list = []
             redirect = reverse('horizon:project:database_clusters:index')
@@ -404,6 +397,8 @@ class LaunchForm(forms.SelfHandlingForm):
                             ds.name, v.name)
                         version_choices = (version_choices +
                                            ((widget_text, selection_text),))
+                        self._add_datastore_network_field(request, ds.name,
+                                                          v.name)
                         if db_capability.supports_configuration(ds.name):
                             self._add_datastore_config_field(request, ds.name,
                                                              v.name)
@@ -441,6 +436,29 @@ class LaunchForm(forms.SelfHandlingForm):
                 request, valid_flavors)
 
         return name, field
+
+    def _add_datastore_network_field(self,
+                                     request,
+                                     datastore,
+                                     datastore_version):
+        name = utils.build_widget_field_name(datastore, datastore_version)
+        attr_key = 'data-datastore-' + name
+        field_name = utils.build_network_field_name(datastore,
+                                                    datastore_version)
+        self.fields[field_name] = forms.ChoiceField(
+            label=_("Network"),
+            help_text=_("Network attached to instance"),
+            required=False,
+            widget=forms.Select(attrs={
+                'class': 'switched',
+                'data-switch-on': 'datastore',
+                attr_key: _("Network")
+            }))
+        if api.base.is_service_enabled(request, 'network'):
+            self.fields[field_name].choices = self.populate_network_choices(
+                request, datastore, datastore_version)
+        else:
+            self.fields[field_name].widget = forms.HiddenInput()
 
     def _add_datastore_config_field(self,
                                     request,
@@ -519,6 +537,14 @@ class LaunchForm(forms.SelfHandlingForm):
             configuration = data[config_field_name]
         return configuration
 
+    def _get_network(self, data, datastore, datastore_version):
+        network = None
+        network_field_name = utils.build_network_field_name(datastore,
+                                                            datastore_version)
+        if data.get(network_field_name):
+            network = data[network_field_name]
+        return network
+
     def _build_extended_properties(self, data, datastore):
         extended_properties = None
 
@@ -577,7 +603,10 @@ class LaunchForm(forms.SelfHandlingForm):
                                            num_instances,
                                            datastore=datastore,
                                            datastore_version=datastore_version,
-                                           nics=data['network'],
+                                           nics=(
+                                               self._get_network(
+                                                   data, datastore,
+                                                   datastore_version)),
                                            root_password=root_password,
                                            locality=self._get_locality(data),
                                            availability_zone=avail_zone,

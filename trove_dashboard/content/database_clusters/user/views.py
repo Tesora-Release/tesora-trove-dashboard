@@ -26,6 +26,7 @@ from trove_dashboard import api
 from trove_dashboard.content.database_clusters.user import forms
 from trove_dashboard.content.database_clusters.user import tables
 from trove_dashboard.content.databases import views as databases_views
+from trove_dashboard.content import utils
 from troveclient import exceptions as trove_exceptions
 
 
@@ -126,10 +127,9 @@ class ManageUsersView(horizon_tables.DataTableView):
             for user in users:
                 # user.cluster = cluster
                 try:
-                    user.access = self.get_user_list_access(self.request,
-                                                            cluster.id,
-                                                            user.name,
-                                                            host=user.host)
+                    user.access = self.get_user_list_access(
+                        self.request, cluster.id, user.name,
+                        host=getattr(user, 'host', None))
                 except exceptions.NOT_FOUND:
                     pass
                 except trove_exceptions.BadRequest as e:
@@ -175,7 +175,7 @@ class AccessDetailView(horizon_tables.DataTableView):
     def get_data(self):
         cluster_id = self.kwargs['cluster_id']
         user_name = self.kwargs['user_name']
-        user_host = self.kwargs['user_host']
+        user_host = utils.parse_user_host(self.kwargs['user_host'])
         try:
             databases = api.trove.database_list(self.request, cluster_id)
         except Exception:

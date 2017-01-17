@@ -24,6 +24,7 @@ from horizon.utils import validators
 
 from trove_dashboard import api
 from trove_dashboard.content.databases import db_capability
+from trove_dashboard.content import utils
 
 
 TROVE_ENABLE_USER_ROLES = getattr(settings, 'TROVE_ENABLE_USER_ROLES', [])
@@ -128,7 +129,7 @@ class EditUserForm(forms.SelfHandlingForm):
                 request,
                 cluster,
                 data['user_name'],
-                host=data['user_host'],
+                host=utils.parse_user_host(data['user_host']),
                 new_name=data['new_name'],
                 new_password=data['new_password'],
                 new_host=data['new_host'])

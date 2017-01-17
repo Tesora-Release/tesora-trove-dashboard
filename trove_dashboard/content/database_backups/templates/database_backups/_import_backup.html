@@ -1,0 +1,7 @@
+{% extends "horizon/common/_modal_form.html" %}
+{% load i18n %}
+
+{% block form_attrs %}enctype="multipart/form-data"{% endblock %}
+{% block modal-body-right %}
+  <p>{% trans "Specify the metadata file and the corresponding backup file to be imported." %}</p>
+{% endblock %}

@@ -140,6 +140,12 @@ def build_flavor_field_name(datastore, datastore_version):
                                    datastore_version)
 
 
+def build_network_field_name(datastore, datastore_version):
+    return 'network-' + \
+           build_widget_field_name(datastore,
+                                   datastore_version)
+
+
 def build_volume_type_field_name(datastore, datastore_version):
     return 'volume-type-' + \
            build_widget_field_name(datastore,

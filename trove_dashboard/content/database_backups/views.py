@@ -15,17 +15,26 @@
 """
 Views for displaying database backups.
 """
+import json
+
 from django.core.urlresolvers import reverse
+from django.core.urlresolvers import reverse_lazy
+from django import http
 from django.utils.translation import ugettext_lazy as _
 
 from horizon import exceptions
+from horizon import forms as horizon_forms
 from horizon import tables as horizon_tables
 from horizon.utils import filters
 from horizon.utils import memoized
 from horizon import views as horizon_views
 from horizon import workflows as horizon_workflows
 
+from openstack_dashboard.dashboards.project.containers.views import (
+    object_download as dash_containers_object_download)
+
 from trove_dashboard import api
+from trove_dashboard.content.database_backups import forms
 from trove_dashboard.content.database_backups import tables
 from trove_dashboard.content.database_backups \
     import workflows
@@ -117,3 +126,74 @@ class DetailView(horizon_views.APIView):
         context['backup'] = backup
         context['instance'] = instance
         return context
+
+
+class BackupFile(object):
+    def __init__(self, name):
+        self.name = name
+
+
+class ExportBackupView(horizon_tables.DataTableView):
+    table_class = tables.ExportBackupTable
+    template_name = 'project/database_backups/export_backup.html'
+    page_title = _("Export Backup")
+
+    @memoized.memoized_method
+    def get_data(self):
+        backup_id = self.kwargs['backup_id']
+        try:
+            backup = api.trove.backup_get(self.request, backup_id)
+        except Exception:
+            redirect = reverse('horizon:project:database_backups:index')
+            exceptions.handle(self.request,
+                              _('Unable to retrieve backup.'),
+                              redirect=redirect)
+
+        backup_name = backup.filename
+        backup_files = []
+        backup_files.append(BackupFile(backup_name + ".metadata"))
+        backup_files.append(BackupFile(backup_name))
+
+        return backup_files
+
+    def get_context_data(self, **kwargs):
+        context = super(ExportBackupView, self).get_context_data(**kwargs)
+        context["backup_files"] = self.get_data()
+        return context
+
+
+def download_backup_object(request, backup_id):
+    backup_info = api.trove.backup_get(request, backup_id)
+    return dash_containers_object_download(request,
+                                           backup_info.container,
+                                           backup_info.filename)
+
+
+def download_backup_metadata(request, backup_id):
+    try:
+        backup = api.trove.backup_get(request, backup_id)
+        response = http.HttpResponse()
+        response.write(json.dumps(backup._info, sort_keys=True))
+        backup_filename = backup.filename + ".metadata"
+        response['Content-Disposition'] = ('attachment; '
+                                           'filename=%s' % backup_filename)
+        response['Content-Length'] = str(len(response.content))
+        return response
+    except Exception:
+        redirect = reverse("horizon:project:database_backups:export",
+                           args=[backup_id])
+        exceptions.handle(request,
+                          _("Unable to download backup metadata."),
+                          redirect=redirect,)
+
+
+class ImportBackupView(horizon_forms.ModalFormView):
+    form_class = forms.ImportBackupForm
+    form_id = "import_backup_form"
+    modal_header = _("Import Backup")
+    modal_id = "import_backup_modal"
+    template_name = 'project/database_backups/import_backup.html'
+    submit_label = _("Import Backup")
+    submit_url = reverse_lazy('horizon:project:database_backups:import')
+    success_url = reverse_lazy('horizon:project:database_backups:index')
+    page_title = _("Import Backup")

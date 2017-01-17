@@ -56,6 +56,70 @@ class LaunchLink(tables.LinkAction):
     icon = "camera"
 
 
+class ImportBackup(tables.LinkAction):
+    name = "import"
+    verbose_name = _("Import Backup")
+    url = "horizon:project:database_backups:import"
+    classes = ("ajax-modal",)
+    icon = "cloud-upload"
+
+
+class DownloadBackupObject(tables.LinkAction):
+    name = "download_backup"
+    verbose_name = _("Download Backup")
+    url = "horizon:project:database_backups:download_backup"
+    icon = "download"
+    allowed_data_types = ("objects",)
+
+    def get_link_url(self, datum):
+        backup_id = self.table.kwargs['backup_id']
+        return reverse(self.url, args=[backup_id])
+
+    def allowed(self, request, object):
+        backup = object
+        return backup.name.endswith("gz.enc")
+
+
+class DownloadBackupMetadata(tables.LinkAction):
+    name = "download_metadata"
+    verbose_name = _("Download Metadata")
+    url = "horizon:project:database_backups:download_metadata"
+    icon = "download"
+    allowed_data_types = ("objects",)
+
+    def get_link_url(self, datum):
+        backup_id = self.table.kwargs['backup_id']
+        return reverse(self.url, args=[backup_id])
+
+    def allowed(self, request, object):
+        backup = object
+        return backup.name.endswith("metadata")
+
+
+class ExportBackupTable(tables.DataTable):
+    name = tables.Column("name", verbose_name=_("Backup File Name"))
+
+    class Meta(object):
+        name = "export_backup_table"
+        verbose_name = _("Export Backup Files")
+        row_actions = (DownloadBackupObject, DownloadBackupMetadata)
+
+    def get_object_id(self, datum):
+        return datum.name
+
+
+class ExportBackup(tables.LinkAction):
+    name = "export"
+    verbose_name = _("Export Backup")
+    url = "horizon:project:database_backups:export"
+
+    def allowed(self, request, backup=None):
+        return backup.status == 'COMPLETED'
+
+    def get_link_url(self, datum):
+        return reverse(self.url, args=[datum.id])
+
+
 class RestoreLink(tables.LinkAction):
     name = "restore"
     verbose_name = _("Restore Backup")
@@ -163,5 +227,5 @@ class BackupsTable(tables.DataTable):
         verbose_name = _("Backups")
         status_columns = ["status"]
         row_class = UpdateRow
-        table_actions = (LaunchLink, DeleteBackup)
-        row_actions = (RestoreLink, DeleteBackup)
+        table_actions = (LaunchLink, ImportBackup, DeleteBackup)
+        row_actions = (RestoreLink, ExportBackup, DeleteBackup)

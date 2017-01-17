@@ -112,16 +112,15 @@ def download_log(request, instance_id, filename):
         else:
             publish = False
 
-        data = get_contents(request,
-                            instance_id,
-                            filename,
-                            publish,
-                            FULL_LOG_VALUE)
-        response = http.HttpResponse()
-        response.write(data)
+        log_generator = api.trove.log_tail(request,
+                                           instance_id,
+                                           filename,
+                                           publish,
+                                           FULL_LOG_VALUE,
+                                           dash_api.swift.swift_api(request))
+        response = http.StreamingHttpResponse(log_generator())
         response['Content-Disposition'] = ('attachment; '
                                            'filename="%s.log"' % filename)
-        response['Content-Length'] = str(len(response.content))
         return response
 
     except Exception as e:

@@ -21,6 +21,7 @@ from horizon import tables
 
 from trove_dashboard import api
 from trove_dashboard.content.databases import tables as databases_tables
+from trove_dashboard.content import utils as database_utils
 
 
 class CreateUser(tables.LinkAction):
@@ -61,7 +62,7 @@ class DeleteUser(tables.DeleteAction):
         user = self.table.get_object_by_id(obj_id)
         api.trove.user_delete(request, self.table.kwargs['cluster_id'],
                               user.name,
-                              host=user.host)
+                              host=getattr(user, 'host', None))
 
 
 class EditUser(tables.LinkAction):
@@ -79,7 +80,7 @@ class EditUser(tables.LinkAction):
         return urlresolvers.reverse(self.url,
                                     args=[self.table.kwargs['cluster_id'],
                                           user.name,
-                                          user.host])
+                                          getattr(user, 'host', '-')])
 
 
 class ManageUsers(tables.LinkAction):
@@ -110,7 +111,7 @@ class ManageAccess(tables.LinkAction):
         return urlresolvers.reverse(self.url,
                                     args=[self.table.kwargs['cluster_id'],
                                           user.name,
-                                          user.host])
+                                          getattr(user, 'host', '-')])
 
 
 class UsersTable(databases_tables.UsersTable):
@@ -150,7 +151,8 @@ class GrantAccess(tables.BatchAction):
             self.table.kwargs['cluster_id'],
             self.table.kwargs['user_name'],
             [obj_id],
-            host=self.table.kwargs['user_host'])
+            host=database_utils.parse_user_host(self.table.kwargs[
+                                                'user_host']))
 
 
 class RevokeAccess(tables.BatchAction):
@@ -184,7 +186,8 @@ class RevokeAccess(tables.BatchAction):
             self.table.kwargs['cluster_id'],
             self.table.kwargs['user_name'],
             obj_id,
-            host=self.table.kwargs['user_host'])
+            host=database_utils.parse_user_host(self.table.kwargs[
+                                                'user_host']))
 
 
 class AccessTable(tables.DataTable):

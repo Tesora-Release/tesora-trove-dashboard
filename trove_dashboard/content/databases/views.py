@@ -404,7 +404,7 @@ class ResizeInstanceView(horizon_forms.ModalFormView):
             instance = api.trove.instance_get(self.request, instance_id)
             flavor_id = instance.flavor['id']
             flavors = {}
-            for i, j in self.get_flavors():
+            for i, j in self.get_flavors(instance):
                 flavors[str(i)] = j
 
             if flavor_id in flavors:
@@ -426,9 +426,12 @@ class ResizeInstanceView(horizon_forms.ModalFormView):
         return context
 
     @memoized.memoized_method
-    def get_flavors(self, *args, **kwargs):
+    def get_flavors(self, instance):
         try:
-            flavors = api.trove.flavor_list(self.request)
+            flavors = api.trove.datastore_flavors(self.request,
+                                                  instance.datastore['type'],
+                                                  instance.datastore['version']
+                                                  )
             return instance_utils.sort_flavor_list(self.request, flavors)
         except Exception:
             redirect = reverse("horizon:project:databases:index")
@@ -438,13 +441,13 @@ class ResizeInstanceView(horizon_forms.ModalFormView):
 
     def get_initial(self):
         initial = super(ResizeInstanceView, self).get_initial()
-        obj = self.get_object()
-        if obj:
+        instance = self.get_object()
+        if instance:
             initial.update({'instance_id': self.kwargs['instance_id'],
-                            'old_flavor_id': obj.flavor['id'],
-                            'old_flavor_name': getattr(obj,
+                            'old_flavor_id': instance.flavor['id'],
+                            'old_flavor_name': getattr(instance,
                                                        'flavor_name', ''),
-                            'flavors': self.get_flavors()})
+                            'flavors': self.get_flavors(instance)})
         return initial
 
 

@@ -287,7 +287,7 @@ class ClustersTests(test.TestCase):
         cluster_instances = 3
         cluster_datastore = u'mongodb'
         cluster_datastore_version = u'2.6'
-        cluster_network = u''
+        cluster_network = None
         trove_api.trove.cluster_create(
             IsA(http.HttpRequest),
             cluster_name,
@@ -308,6 +308,7 @@ class ClustersTests(test.TestCase):
 
         field_name = utils.build_widget_field_name(cluster_datastore,
                                                    cluster_datastore_version)
+
         self.mox.ReplayAll()
         post = {
             'name': cluster_name,
@@ -378,6 +379,9 @@ class ClustersTests(test.TestCase):
 
         field_name = utils.build_widget_field_name(cluster_datastore,
                                                    cluster_datastore_version)
+        network_field_name = utils.build_network_field_name(
+            cluster_datastore, cluster_datastore_version)
+
         self.mox.ReplayAll()
         post = {
             'name': cluster_name,
@@ -387,7 +391,9 @@ class ClustersTests(test.TestCase):
             'datastore': field_name,
             field_name: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
             'network': cluster_network,
-            'region': ""
+            'region': "",
+            'nic': network_field_name,
+            network_field_name: '82288d84-e0a5-42ac-95be-e6af08727e42'
         }
 
         res = self.client.post(LAUNCH_URL, post)
